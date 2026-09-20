@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { SiteHeader } from "@/components/site-header";
 import { WeekView } from "@/components/week-view";
 import { getOwnerStreamer } from "@/lib/auth";
 import { PUBLISHED_WEEKS, buildWeeks } from "@/lib/schedule";
@@ -24,23 +23,20 @@ type SP = Promise<{ saved?: string; error?: string }>;
 
 export default function EditPage({ searchParams }: { searchParams: SP }) {
   return (
-    <>
-      <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-8">
-        <Suspense fallback={<p className="text-neutral-500">加载中…</p>}>
+        <Suspense fallback={<p className="text-muted">加载中…</p>}>
           <Editor searchParams={searchParams} />
         </Suspense>
       </main>
-    </>
   );
 }
 
 const input =
-  "rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+  "rounded-md border border-line bg-bg px-2 py-1.5 text-sm";
 const btn =
-  "rounded-md border border-neutral-300 px-2.5 py-1 text-sm hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800";
+  "rounded-md border border-line px-2.5 py-1 text-sm hover:bg-fg/5";
 const btnPrimary =
-  "rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900";
+  "rounded-md bg-fg px-3 py-1.5 text-sm text-bg hover:opacity-90";
 
 async function Editor({ searchParams }: { searchParams: SP }) {
   const [streamer, sp] = await Promise.all([getOwnerStreamer(), searchParams]);
@@ -82,7 +78,7 @@ async function Editor({ searchParams }: { searchParams: SP }) {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">{streamer.display_name || "（未命名）"}</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             {streamer.status === "active" ? (
               <>
                 已上线：
@@ -150,15 +146,15 @@ async function Editor({ searchParams }: { searchParams: SP }) {
       {/* ---------------- 每周模板 ---------------- */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">每周模板</h2>
-        <p className="text-sm text-neutral-500">固定的每周安排。没有时段的日子显示为定休。时间为北京时间。</p>
-        <ol className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+        <p className="text-sm text-muted">固定的每周安排。没有时段的日子显示为定休。时间为北京时间。</p>
+        <ol className="divide-y divide-line rounded-xl border border-line bg-bg">
           {Array.from({ length: 7 }, (_, i) => i + 1).map((wd) => {
             const slots = tpl.filter((t) => t.weekday === wd);
             return (
               <li key={wd} className="space-y-2 px-4 py-3">
                 <div className="flex items-baseline gap-3">
                   <span className="w-12 font-medium">{WEEKDAY_LABELS[wd]}</span>
-                  {slots.length === 0 ? <span className="text-neutral-400">定休</span> : null}
+                  {slots.length === 0 ? <span className="text-muted">定休</span> : null}
                 </div>
                 {slots.length ? (
                   <ul className="space-y-1 pl-12">
@@ -168,7 +164,7 @@ async function Editor({ searchParams }: { searchParams: SP }) {
                           {minutesToHHMM(s.start_min)}–{minutesToHHMM(s.end_min)}
                         </span>
                         <span>{s.type}</span>
-                        {s.note ? <span className="text-neutral-500">{s.note}</span> : null}
+                        {s.note ? <span className="text-muted">{s.note}</span> : null}
                         <form action={deleteTemplateSlot}>
                           <input type="hidden" name="id" value={s.id} />
                           <button className="text-xs text-red-600 hover:underline">删除</button>
@@ -178,7 +174,7 @@ async function Editor({ searchParams }: { searchParams: SP }) {
                   </ul>
                 ) : null}
                 <details className="pl-12">
-                  <summary className="cursor-pointer text-xs text-neutral-500">添加时段</summary>
+                  <summary className="cursor-pointer text-xs text-muted">添加时段</summary>
                   <form action={addTemplateSlot} className="mt-2">
                     <input type="hidden" name="weekday" value={wd} />
                     <SlotFields />
@@ -193,22 +189,22 @@ async function Editor({ searchParams }: { searchParams: SP }) {
       {/* ---------------- 本周与接下来 ---------------- */}
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">本周与接下来</h2>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted">
           按模板生成的四周安排。这里的改动只影响那一天，不改模板。
         </p>
         {weeks.map((week) => (
-          <details key={week.week_start} open={week.week_start === from} className="rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <details key={week.week_start} open={week.week_start === from} className="rounded-xl border border-line bg-bg">
             <summary className="cursor-pointer px-4 py-2 font-medium">
               {shortMD(week.week_start)} 起的一周{week.week_start === from ? "（本周）" : ""}
             </summary>
-            <ol className="divide-y divide-neutral-200 border-t border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800">
+            <ol className="divide-y divide-line border-t border-line">
               {week.days.map((d) => (
                 <li key={d.weekday} className="space-y-2 px-4 py-3">
                   <div className="flex flex-wrap items-baseline gap-x-3">
                     <span className={`w-12 ${d.date === today ? "font-semibold" : "font-medium"}`}>{WEEKDAY_LABELS[d.weekday]}</span>
-                    <span className="text-xs text-neutral-500">{shortMD(d.date)}</span>
+                    <span className="text-xs text-muted">{shortMD(d.date)}</span>
                     {d.overridden ? <span className="text-xs text-amber-600">已改动</span> : null}
-                    {d.off ? <span className="text-neutral-400">定休</span> : null}
+                    {d.off ? <span className="text-muted">定休</span> : null}
                   </div>
                   {d.slots.length ? (
                     <ul className="space-y-1 pl-12">
@@ -218,7 +214,7 @@ async function Editor({ searchParams }: { searchParams: SP }) {
                             {s.start}–{s.end}
                           </span>
                           <span>{s.type}</span>
-                          {s.note ? <span className="text-neutral-500">{s.note}</span> : null}
+                          {s.note ? <span className="text-muted">{s.note}</span> : null}
                           <form action={deleteOverrideSlot}>
                             <input type="hidden" name="week_start" value={week.week_start} />
                             <input type="hidden" name="weekday" value={d.weekday} />

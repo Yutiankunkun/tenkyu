@@ -1,5 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { createAnonClient } from "@/lib/supabase/anon";
+import { HANDLE_RE } from "@/lib/types";
 import type {
   PublishedDay,
   PublishedSchedule,
@@ -12,7 +13,7 @@ import type {
 } from "@/lib/types";
 import { addDays, minutesToHHMM, parseISODate, toISODate } from "@/lib/time";
 
-export const HANDLE_RE = /^[a-z0-9][a-z0-9-]{1,30}$/;
+export { HANDLE_RE } from "@/lib/types";
 export const PUBLISHED_WEEKS = 4;
 
 export function scheduleTag(handle: string) {

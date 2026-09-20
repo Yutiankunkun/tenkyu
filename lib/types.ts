@@ -84,4 +84,7 @@ export type PublishedSchedule = PublishedStreamer & {
 };
 
 export const SLOT_TYPES = ["杂谈", "游戏", "歌回", "联动", "其他"] as const;
+/** Public URL slug rule (client-safe; lib/schedule re-exports it for the server). */
+export const HANDLE_RE = /^[a-z0-9][a-z0-9-]{1,30}$/;
+export const MAX_PICKS = 12;
 export const WEEKDAY_LABELS = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"] as const;

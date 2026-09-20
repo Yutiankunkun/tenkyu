@@ -1,27 +1,56 @@
 @import "tailwindcss";
 
+/* Design tokens. Streamer theme colours are used only for time text, dots and
+   grid blocks — chrome always uses these. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Hiragino Sans GB",
-    "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --bg: #ffffff;
+  --fg: #171717;
+  --muted: #6b7280;
+  --line: #e5e7eb;
+  --accent: #5b8def;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0b0b0c;
+    --fg: #ededed;
+    --muted: #9ca3af;
+    --line: #262626;
+    --accent: #7ea6f5;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --font-sans:
+    var(--font-noto-sc), ui-sans-serif, system-ui, -apple-system, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans SC", monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--fg);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Buttons and inputs get comfortable tap targets on touch screens. */
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  summary {
+    min-height: 40px;
+  }
 }

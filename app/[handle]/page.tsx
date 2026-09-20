@@ -4,9 +4,10 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
-import { SiteHeader } from "@/components/site-header";
+import { TzToggle } from "@/components/tz-provider";
 import { WeekView } from "@/components/week-view";
 import { HANDLE_RE, getPublishedSchedule } from "@/lib/schedule";
+import { SITE_URL } from "@/lib/site";
 import { addDays, currentWeekStart, isMonday, parseISODate, shanghaiNow, shortMD, toISODate } from "@/lib/time";
 
 type Params = Promise<{ handle: string }>;
@@ -17,22 +18,22 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!HANDLE_RE.test(handle)) return {};
   const data = await getPublishedSchedule(handle, currentWeekStart());
   if (!data) return {};
+  const title = `${data.display_name} 的本周直播`;
+  const description = data.intro || `${data.display_name} 的直播时间表（北京时间）`;
   return {
-    title: `${data.display_name} 的本周直播`,
-    description: data.intro || `${data.display_name} 的直播时间表（北京时间）`,
+    title,
+    description,
+    openGraph: { title, description, url: `${SITE_URL}/${handle}` },
   };
 }
 
 export default function StreamerPage(props: { params: Params; searchParams: SP }) {
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-3xl px-4 py-8">
-        <Suspense fallback={<p className="text-neutral-500">加载中…</p>}>
-          <StreamerWeek {...props} />
-        </Suspense>
-      </main>
-    </>
+    <main className="mx-auto w-full max-w-3xl px-4 py-8">
+      <Suspense fallback={<p className="text-muted">加载中…</p>}>
+        <StreamerWeek {...props} />
+      </Suspense>
+    </main>
   );
 }
 
@@ -66,7 +67,7 @@ async function StreamerWeek({ params, searchParams }: { params: Params; searchPa
         <Avatar src={data.avatar_url} name={data.display_name} color={data.theme_color} size={56} />
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold">{data.display_name}</h1>
-          {data.intro ? <p className="text-sm text-neutral-600 dark:text-neutral-400">{data.intro}</p> : null}
+          {data.intro ? <p className="text-sm text-muted">{data.intro}</p> : null}
         </div>
         {data.bili_room_url ? (
           <a
@@ -81,24 +82,30 @@ async function StreamerWeek({ params, searchParams }: { params: Params; searchPa
         ) : null}
       </header>
 
-      <nav className="flex items-center justify-between text-sm">
-        <Link href={`/${handle}?w=${prev}`} className="text-neutral-500 hover:underline">
-          ← 上一周
-        </Link>
-        <span className="font-medium">
-          {shortMD(week.week_start)} – {shortMD(week.days[6].date)}
-          {weekStart === current ? "（本周）" : ""}
-        </span>
-        <Link href={`/${handle}?w=${next}`} className="text-neutral-500 hover:underline">
-          下一周 →
-        </Link>
+      <nav className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="flex items-center gap-3">
+          <Link href={`/${handle}?w=${prev}`} className="text-muted hover:text-fg">
+            ← 上一周
+          </Link>
+          <span className="font-medium">
+            {shortMD(week.week_start)} – {shortMD(week.days[6].date)}
+            {weekStart === current ? "（本周）" : ""}
+          </span>
+          <Link href={`/${handle}?w=${next}`} className="text-muted hover:text-fg">
+            下一周 →
+          </Link>
+        </div>
+        <TzToggle />
       </nav>
 
       <WeekView week={week} color={data.theme_color} today={today} />
 
-      <p className="text-xs text-neutral-400">
-        时间为北京时间。以主播直播间公告为准。
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+        <span>以主播直播间公告为准。</span>
+        <span>
+          把 <code className="rounded bg-fg/5 px-1">tenkyu.app/{handle}</code> 贴在 B 站简介里，粉丝随时能看。
+        </span>
+      </div>
     </article>
   );
 }
