@@ -19,7 +19,7 @@ export function WeekView({ week, color, today }: Props) {
           >
             <div className="w-16 shrink-0">
               <div className={isToday ? "font-semibold" : "font-medium"}>{WEEKDAY_LABELS[d.weekday]}</div>
-              <div className="text-xs text-muted">{shortMD(d.date)}{isToday ? " · 今天" : ""}</div>
+              <div className="whitespace-nowrap text-xs text-muted">{shortMD(d.date)}{isToday ? " · 今天" : ""}</div>
             </div>
             <div className="min-w-0 flex-1">
               {d.off ? (
