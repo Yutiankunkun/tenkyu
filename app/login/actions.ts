@@ -32,7 +32,10 @@ export async function requestMagicLink(formData: FormData) {
     .select("id")
     .eq("auth_email", email)
     .maybeSingle();
-  if (error) redirect("/login?error=server");
+  if (error) {
+    console.error("[login] allowlist lookup failed", error);
+    redirect("/login?error=server");
+  }
 
   if (streamer) {
     const sb = await createServerSupabase();
@@ -41,7 +44,14 @@ export async function requestMagicLink(formData: FormData) {
       email,
       options: { emailRedirectTo: `${origin}/auth/callback`, shouldCreateUser: true },
     });
-    if (otpErr) redirect("/login?error=send");
+    if (otpErr) {
+      // Server log only; the client keeps the neutral message.
+      console.error("[login] signInWithOtp failed", { status: otpErr.status, code: otpErr.code, message: otpErr.message });
+      redirect("/login?error=send");
+    }
+    console.info("[login] magic link requested", { redirectTo: `${origin}/auth/callback` });
+  } else {
+    console.warn("[login] email not on allowlist");
   }
 
   redirect("/login?sent=1");
