@@ -90,14 +90,16 @@ create trigger week_override_set_updated_at
   before update on public.week_override
   for each row execute function public.set_updated_at();
 
--- handle / auth_email / status may only change through the service role
--- (server actions using the secret key). Owners editing via RLS cannot touch them.
+-- handle / auth_email / status may only change through the service role or the
+-- dashboard (postgres role, no JWT). Owners editing via RLS (authenticated) and
+-- anon cannot touch them. NOTE: only block the RLS roles — checking
+-- `<> 'service_role'` would also block the SQL editor, whose auth.role() is null.
 create or replace function public.streamer_guard_protected_columns()
 returns trigger
 language plpgsql
 as $$
 begin
-  if coalesce(auth.role(), '') <> 'service_role' then
+  if coalesce(auth.role(), '') in ('authenticated', 'anon') then
     if new.handle     is distinct from old.handle
     or new.auth_email is distinct from old.auth_email
     or new.status     is distinct from old.status then
