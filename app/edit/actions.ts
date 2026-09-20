@@ -25,6 +25,7 @@ function fail(msg: string): never {
 
 async function afterScheduleChange(streamer: StreamerRow) {
   updateTag(scheduleTag(streamer.handle));
+  updateTag(STREAMERS_TAG); // name / avatar / intro feed the home list and pickers
   await maybeActivate(streamer);
   revalidatePath("/edit");
 }
