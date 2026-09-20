@@ -9,7 +9,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ handle: string
   const { handle } = await ctx.params;
   if (!HANDLE_RE.test(handle)) return notFound();
 
-  const data = await getPublishedSchedule(handle, currentWeekStart());
+  let data;
+  try {
+    data = await getPublishedSchedule(handle, currentWeekStart());
+  } catch (e) {
+    console.error("[data] schedule read failed", handle, e);
+    return Response.json(
+      { error: "unavailable" },
+      { status: 503, headers: { "Access-Control-Allow-Origin": "*", "Retry-After": "60" } },
+    );
+  }
   if (!data) return notFound();
 
   return Response.json(data, {
