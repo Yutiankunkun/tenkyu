@@ -1,0 +1,7 @@
+# Repo is edited from both Windows and macOS on a shared exFAT volume: keep LF in the repo.
+* text=auto eol=lf
+*.ico binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
