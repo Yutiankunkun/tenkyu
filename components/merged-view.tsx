@@ -151,8 +151,9 @@ export function MergedView({ streamers, today }: Props) {
               ←
             </button>
             <span className="font-medium">
-              {weekMeta ? `${shortMD(weekMeta.week_start)} – ${shortMD(weekMeta.days[6].date)}` : "本周"}
-              {week === 0 ? "（本周）" : ""}
+              {weekMeta
+                ? `${shortMD(weekMeta.week_start)} – ${shortMD(weekMeta.days[6].date)}${week === 0 ? "（本周）" : ""}`
+                : "本周"}
             </span>
             <button type="button" className="rounded-md border border-line px-2.5 py-1 disabled:opacity-40" disabled={week >= 3} onClick={() => setWeek((w) => w + 1)}>
               →
