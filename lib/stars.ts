@@ -87,9 +87,22 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
       .eq("room_id", roomId)
       .is("deleted_at", null)
       .maybeSingle<{ uid: number; uname: string; face: string; fans: number | null; level: number | null }>();
-    if (!s) return null;
-    uid = s.uid;
-    base = s;
+    if (s) {
+      uid = s.uid;
+      base = s;
+    } else {
+      // Claimed streamer the collector has never seen live: build the page from her own profile.
+      const { data: c } = await sb
+        .from("streamer")
+        .select("bili_uid, display_name, avatar_url")
+        .eq("bili_room_id", roomId)
+        .eq("status", "active")
+        .not("bili_uid", "is", null)
+        .maybeSingle<{ bili_uid: number; display_name: string; avatar_url: string }>();
+      if (!c) return null;
+      uid = c.bili_uid;
+      base = { uname: c.display_name, face: c.avatar_url, fans: null, level: null };
+    }
   }
   const { data: claimed } = await sb.from("streamer").select("handle").eq("bili_uid", uid).eq("status", "active").maybeSingle<{ handle: string }>();
   const fresh = live && Date.parse(live.seen_at) > Date.now() - STARS_STALE_MIN * 60 * 1000;
