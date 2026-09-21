@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { ScheduleImage } from "@/components/schedule-image";
 import { WeekView } from "@/components/week-view";
 import { getOwnerStreamer } from "@/lib/auth";
 import { PUBLISHED_WEEKS, buildWeeks } from "@/lib/schedule";
@@ -254,6 +255,17 @@ async function Editor({ searchParams }: { searchParams: SP }) {
             </ol>
           </details>
         ))}
+      </section>
+
+      {/* ---------------- 周报图 ---------------- */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">周报图</h2>
+        <p className="text-sm text-muted">用当前日程生成一张可以直接发动态的图。</p>
+        {streamer.status === "active" ? (
+          <ScheduleImage handle={streamer.handle} displayName={streamer.display_name} themeColor={streamer.theme_color} avatarUrl={streamer.avatar_url} />
+        ) : (
+          <p className="text-sm text-muted">上线后可用。</p>
+        )}
       </section>
 
       {/* ---------------- 预览 ---------------- */}

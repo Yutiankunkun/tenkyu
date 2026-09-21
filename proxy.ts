@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  if (!user && pathname.startsWith("/edit")) {
+  if (!user && (pathname.startsWith("/edit") || pathname.startsWith("/admin"))) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";
@@ -47,5 +47,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/edit/:path*", "/login"],
+  matcher: ["/edit/:path*", "/admin/:path*", "/login"],
 };
