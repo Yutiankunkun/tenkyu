@@ -50,8 +50,10 @@ async function Notice({ searchParams }: { searchParams: SP }) {
     const msg =
       sp.error === "email"
         ? "邮箱格式不对。"
-        : sp.error === "send"
-          ? "发送失败，请稍后再试。"
+        : sp.error === "ratelimit"
+          ? "请求太频繁。上一封登录邮件可能已经发出，请先查收邮箱；1 分钟后才能再发一封。"
+          : sp.error === "send"
+            ? "发送失败，请稍后再试。"
           : sp.error === "callback"
             ? "登录链接无效或已过期，请重新发送。"
             : "服务器开小差了，请稍后再试。";

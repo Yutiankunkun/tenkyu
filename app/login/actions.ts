@@ -45,9 +45,9 @@ export async function requestMagicLink(formData: FormData) {
       options: { emailRedirectTo: `${origin}/auth/callback`, shouldCreateUser: true },
     });
     if (otpErr) {
-      // Server log only; the client keeps the neutral message.
+      // Server log only; the client gets a coarse reason (rate limit vs other).
       console.error("[login] signInWithOtp failed", { status: otpErr.status, code: otpErr.code, message: otpErr.message });
-      redirect("/login?error=send");
+      redirect(otpErr.status === 429 ? "/login?error=ratelimit" : "/login?error=send");
     }
     console.info("[login] magic link requested", { redirectTo: `${origin}/auth/callback` });
   } else {
