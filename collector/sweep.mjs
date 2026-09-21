@@ -239,3 +239,10 @@ console.log(
     `backfill ${b.done} (deleted ${b.deleted}); fans refreshed ${f}; levels refreshed ${l.done} (deleted ${l.deleted}); ` +
     `claimed hidden ${hidden}; risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
 );
+
+// A failed sweep (Bilibili error / risk control) is worth an email: GitHub notifies the
+// repo owner on a failed workflow run. Maintenance phases above still ran.
+if (!s.ok || riskControl) {
+  console.error("sweep did not complete — failing the run so GitHub Actions sends a notification");
+  process.exit(1);
+}

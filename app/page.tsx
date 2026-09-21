@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { PickButton } from "@/components/pick-button";
+import { StarsPreview } from "@/components/stars-preview";
 import { getActiveStreamers } from "@/lib/schedule";
 
 export default function Home() {
@@ -23,14 +24,25 @@ export default function Home() {
         </div>
       </div>
 
+      <div className="mt-12">
+        <Suspense fallback={null}>
+          <LiveTeaser />
+        </Suspense>
+      </div>
+
       <section className="mt-12 space-y-3">
-        <h2 className="text-lg font-semibold">主播</h2>
+        <h2 className="text-lg font-semibold">入驻主播</h2>
         <Suspense fallback={<p className="text-muted">加载中…</p>}>
           <StreamerList />
         </Suspense>
       </section>
     </main>
   );
+}
+
+async function LiveTeaser() {
+  await connection();
+  return <StarsPreview limit={6} />;
 }
 
 async function StreamerList() {
