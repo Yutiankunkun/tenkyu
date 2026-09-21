@@ -97,6 +97,59 @@ async function sweep() {
   return { ok: true, rooms, pages };
 }
 
+// ---------------------------------------------------------------- 1b. room details (tags, keyframe, real start)
+const DETAIL_BATCH = 80; // endpoint verified with 90 uids per request
+
+/** "2026-09-21 20:00:05" (Asia/Shanghai) → ISO instant; Bilibili sends "0000-00-00 00:00:00" or 0 when unknown. */
+function liveTimeToIso(v) {
+  if (typeof v === "number") return v > 0 ? new Date(v * 1000).toISOString() : null;
+  const m = typeof v === "string" && /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(v);
+  if (!m || m[1] === "0000") return null;
+  const [, y, mo, d, h, mi, s] = m.map(Number);
+  return new Date(Date.UTC(y, mo - 1, d, h, mi, s) - 8 * 3600 * 1000).toISOString();
+}
+
+async function fetchDetails(uids) {
+  const out = [];
+  let requests = 0;
+  for (let i = 0; i < uids.length; i += DETAIL_BATCH) {
+    if (overBudget()) break;
+    const chunk = uids.slice(i, i + DETAIL_BATCH);
+    const body = new URLSearchParams();
+    for (const u of chunk) body.append("uids[]", String(u));
+    let j;
+    try {
+      const res = await fetch("https://api.live.bilibili.com/room/v1/Room/get_status_info_by_uids", {
+        method: "POST",
+        headers: { ...UA, "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        signal: AbortSignal.timeout(15000),
+      });
+      j = await res.json();
+      if (j.code === -352 || j.code === -412) riskControl = true;
+    } catch {
+      j = { code: -2 };
+    }
+    requests++;
+    if (j.code !== 0) {
+      console.log(`details: chunk ${i / DETAIL_BATCH + 1} code ${j.code} ${j.message ?? ""} — stopping details`);
+      break;
+    }
+    const rooms = Array.isArray(j.data) ? j.data : Object.values(j.data ?? {});
+    for (const r of rooms) {
+      if (!r.uid) continue;
+      const tags = String(r.tags ?? "")
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0 && t.length <= 20)
+        .slice(0, 12);
+      out.push({ uid: r.uid, tags, keyframe: r.keyframe || null, started_at: liveTimeToIso(r.live_time) });
+    }
+    await sleep(SPACING_MS);
+  }
+  return { rows: out, requests };
+}
+
 // ---------------------------------------------------------------- 2. profiles
 function deletedFromCard(j) {
   // -404 「啥都木有」 = no such user; a deleted account also shows as name 账号已注销.
@@ -219,10 +272,20 @@ const t0 = Date.now();
 const s = await sweep();
 let upserted = 0;
 let removed = 0;
+let detailed = 0;
 if (s.ok && s.rooms.size > 0) {
   const rows = [...s.rooms.values()];
   await rpc("upsert_bili_streamers", { rows: rows.map(({ uid, uname, face, room_id }) => ({ uid, uname, face, room_id })) });
   upserted = await rpc("upsert_live_now", { rows: rows.map(({ uid, room_id, title, cover, online, area }) => ({ uid, room_id, title, cover, online, area })) });
+  // Tags / keyframe / real start time for every live room (batch endpoint, 30 per request).
+  const det = await fetchDetails(rows.map((r) => r.uid));
+  if (det.rows.length) {
+    try {
+      detailed = (await rpc("upsert_live_details", { rows: det.rows })) ?? 0;
+    } catch (e) {
+      console.log(`upsert_live_details unavailable (${e instanceof Error ? e.message.slice(0, 80) : e}); apply migration 0004`);
+    }
+  }
   // Rooms not seen for STALE_MIN minutes: archived into live_session, then dropped (one RPC).
   // Until migration 0003 is applied the RPC does not exist → plain delete, no history.
   try {
@@ -242,7 +305,7 @@ const l = await refreshLevels();
 const hidden = await hideDeletedClaimed();
 
 console.log(
-  `sweep ${s.ok ? "ok" : "FAILED"}: ${s.rooms.size} live rooms in ${s.pages} pages; live_now +${upserted} -${removed}; ` +
+  `sweep ${s.ok ? "ok" : "FAILED"}: ${s.rooms.size} live rooms in ${s.pages} pages; live_now +${upserted} -${removed}; details ${detailed}; ` +
     `backfill ${b.done} (deleted ${b.deleted}); fans refreshed ${f}; levels refreshed ${l.done} (deleted ${l.deleted}); ` +
     `claimed hidden ${hidden}; risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
 );

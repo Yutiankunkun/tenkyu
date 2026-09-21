@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { FAVS_KEY, FavButton, parseFavs } from "@/components/fav-button";
 import { useLocalString } from "@/lib/local-store";
-import { formatFans, minutesLive, type StarRow } from "@/lib/stars";
+import { formatFans, formatLive, minutesLive, type StarRow } from "@/lib/stars";
 
 type Props = {
   rows: StarRow[];
@@ -84,9 +84,9 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
               <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
                 <Link href={`/watch/${r.room_id}`} className="block">
                   <div className="aspect-video bg-fg/5">
-                    {r.cover ? (
+                    {r.keyframe || r.cover ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
+                      <img src={r.keyframe || r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                 </Link>
@@ -107,8 +107,17 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
                     <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted">
                       {r.area ? <span>{r.area}</span> : null}
                       <span>{formatFans(r.bili_streamer.fans)}</span>
-                      {mins !== null ? <span>已播 {mins >= 60 ? `${Math.floor(mins / 60)} 小时 ${mins % 60} 分` : `${mins} 分`}</span> : null}
+                      {mins !== null ? <span>已播 {formatLive(mins)}</span> : null}
                     </div>
+                    {r.tags.length ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {r.tags.slice(0, 4).map((t) => (
+                          <Link key={t} href={`/stars?tag=${encodeURIComponent(t)}`} className="rounded-full border border-line px-1.5 py-0.5 text-[11px] text-muted hover:text-fg">
+                            {t}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                   <FavButton uid={r.uid} name={r.bili_streamer.uname} size="sm" />
                 </div>

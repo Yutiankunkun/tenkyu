@@ -7,7 +7,7 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
   let rows: Awaited<ReturnType<typeof getStars>>["rows"] = [];
   let total = 0;
   try {
-    const data = await getStars("small", null);
+    const data = await getStars({ band: "small", area: null, tag: null, q: null, sort: "new" });
     total = data.rows.length;
     rows = data.rows.slice(0, limit);
   } catch {
@@ -27,9 +27,9 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
           <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
             <Link href={`/watch/${r.room_id}`} className="block">
               <div className="aspect-video bg-fg/5">
-                {r.cover ? (
+                {r.keyframe || r.cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
+                  <img src={r.keyframe || r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
                 ) : null}
               </div>
               <div className="flex items-center gap-2 p-2.5">

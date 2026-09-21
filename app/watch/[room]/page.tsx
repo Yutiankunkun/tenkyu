@@ -5,7 +5,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { FavButton } from "@/components/fav-button";
-import { formatFans, getWatch, minutesLive } from "@/lib/stars";
+import { PlayerGate } from "@/components/player-gate";
+import { formatFans, formatLive, getWatch, minutesLive } from "@/lib/stars";
 
 type Params = Promise<{ room: string }>;
 
@@ -44,16 +45,10 @@ async function Watch({ params }: { params: Params }) {
 
   return (
     <article>
-      {/* player: full content width, 16:9 */}
+      {/* player: full content width, 16:9, click to play */}
       <div className="aspect-video w-full bg-black sm:overflow-hidden sm:rounded-xl">
         {w.live ? (
-          <iframe
-            src={`https://www.bilibili.com/blackboard/live/live-activity-player.html?cid=${w.room_id}&quality=0`}
-            title={`${w.uname} 的直播`}
-            className="h-full w-full"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
-          />
+          <PlayerGate roomId={w.room_id} name={w.uname} poster={w.live.keyframe || w.live.cover} />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-400">
             <span>现在没有在播</span>
@@ -72,7 +67,7 @@ async function Watch({ params }: { params: Params }) {
             {w.live ? (
               <>
                 直播中
-                {mins !== null ? ` · 已播 ${mins >= 60 ? `${Math.floor(mins / 60)} 小时 ${mins % 60} 分` : `${mins} 分`}` : ""}
+                {mins !== null ? ` · 已播 ${formatLive(mins)}` : ""}
                 {w.live.area ? ` · ${w.live.area}` : ""}
                 {w.live.online ? ` · 人气 ${w.live.online.toLocaleString("zh-CN")}` : ""}
               </>
@@ -80,6 +75,15 @@ async function Watch({ params }: { params: Params }) {
               "未在播"
             )}
           </p>
+          {w.live && w.live.tags.length ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {w.live.tags.map((t) => (
+                <Link key={t} href={`/stars?tag=${encodeURIComponent(t)}`} className="rounded-full border border-line px-2 py-0.5 text-xs text-muted hover:text-fg">
+                  {t}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {/* streamer row */}
@@ -105,26 +109,15 @@ async function Watch({ params }: { params: Params }) {
           </div>
           <div className="flex items-center gap-2">
             <FavButton uid={w.uid} name={w.uname} />
-            <a
-              href={roomUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md bg-fg px-3 py-2 text-sm font-medium text-bg hover:opacity-90"
-            >
+            <a href={roomUrl} target="_blank" rel="noopener noreferrer" className="rounded-md bg-fg px-3 py-2 text-sm font-medium text-bg hover:opacity-90">
               去直播间
             </a>
-            <a
-              href={spaceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5"
-            >
+            <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">
               B 站主页
             </a>
           </div>
         </div>
 
-        {/* claimed: schedule entry */}
         {w.handle ? (
           <p className="mt-4 text-sm">
             她在天球维护自己的日程：

@@ -1,18 +1,23 @@
 import { createAnonClient } from "@/lib/supabase/anon";
 
 // 观星台 read model. Gate = account level >= 3, account not deleted, seen in the
-// last STALE_MIN minutes. Fans band and area are display filters.
+// last STALE_MIN minutes. Band / area / tag / search / sort are display filters,
+// applied in memory (a few thousand rows at most).
 
 export const STARS_STALE_MIN = 20;
 export const LEVEL_GATE = 3;
 export type Band = "new" | "small" | "all";
 export const BAND_LIMIT: Record<Band, number | null> = { new: 1000, small: 10000, all: null };
+export type Sort = "new" | "hot" | "small";
+export const SORT_LABEL: Record<Sort, string> = { new: "刚开播", hot: "人气高", small: "粉丝少" };
 
 export type StarRow = {
   uid: number;
   room_id: number;
   title: string;
   cover: string;
+  keyframe: string;
+  tags: string[];
   online: number;
   area: string;
   started_at: string | null;
@@ -22,29 +27,59 @@ export type StarRow = {
 
 export type ClaimedMap = Map<number, string>; // bili_uid → handle
 
-export async function getStars(
-  band: Band,
-  area: string | null,
-): Promise<{ rows: StarRow[]; areas: string[]; updatedAt: string | null; now: number }> {
+export type StarsQuery = { band: Band; area: string | null; tag: string | null; q: string | null; sort: Sort };
+
+export type StarsResult = {
+  rows: StarRow[];
+  areas: string[];
+  topTags: string[];
+  updatedAt: string | null;
+  now: number;
+};
+
+const norm = (s: string) => s.toLowerCase();
+
+export async function getStars(query: StarsQuery): Promise<StarsResult> {
   const sb = createAnonClient();
   const since = new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString();
   let q = sb
     .from("live_now")
-    .select("uid, room_id, title, cover, online, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level)")
+    .select("uid, room_id, title, cover, keyframe, tags, online, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level)")
     .gte("seen_at", since)
     .gte("bili_streamer.level", LEVEL_GATE)
     .is("bili_streamer.deleted_at", null)
-    .order("started_at", { ascending: false, nullsFirst: false })
-    .limit(400);
-  const limit = BAND_LIMIT[band];
+    .limit(3000);
+  const limit = BAND_LIMIT[query.band];
   if (limit !== null) q = q.lt("bili_streamer.fans", limit);
   const { data, error } = await q.returns<StarRow[]>();
   if (error) throw error;
-  const all = data ?? [];
+  const all = (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [], keyframe: r.keyframe ?? "" }));
+
   const areas = [...new Set(all.map((r) => r.area).filter(Boolean))].sort();
-  const rows = area ? all.filter((r) => r.area === area) : all;
+  const tagCount = new Map<string, number>();
+  for (const r of all) for (const t of r.tags) tagCount.set(t, (tagCount.get(t) ?? 0) + 1);
+  const topTags = [...tagCount.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh"))
+    .slice(0, 18)
+    .map(([t]) => t);
+
+  let rows = all;
+  if (query.area) rows = rows.filter((r) => r.area === query.area);
+  if (query.tag) rows = rows.filter((r) => r.tags.includes(query.tag!));
+  if (query.q) {
+    const needle = norm(query.q);
+    rows = rows.filter(
+      (r) => norm(r.bili_streamer.uname).includes(needle) || norm(r.title).includes(needle) || r.tags.some((t) => norm(t).includes(needle)),
+    );
+  }
+  const byStart = (a: StarRow, b: StarRow) => (b.started_at ?? "").localeCompare(a.started_at ?? "");
+  if (query.sort === "hot") rows = [...rows].sort((a, b) => b.online - a.online || byStart(a, b));
+  else if (query.sort === "small") rows = [...rows].sort((a, b) => (a.bili_streamer.fans ?? 1e9) - (b.bili_streamer.fans ?? 1e9) || byStart(a, b));
+  else rows = [...rows].sort(byStart);
+
   const updatedAt = all.length ? all.map((r) => r.seen_at).sort().at(-1)! : null;
-  return { rows, areas, updatedAt, now: Date.now() };
+  return { rows, areas, topTags, updatedAt, now: Date.now() };
 }
 
 /** Active onboarded streamers keyed by Bilibili uid, for the 已入驻 badge. */
@@ -61,7 +96,16 @@ export type WatchData = {
   face: string;
   fans: number | null;
   level: number | null;
-  live: { title: string; cover: string; online: number; area: string; started_at: string | null; seen_at: string } | null;
+  live: {
+    title: string;
+    cover: string;
+    keyframe: string;
+    tags: string[];
+    online: number;
+    area: string;
+    started_at: string | null;
+    seen_at: string;
+  } | null;
   handle: string | null;
   now: number;
 };
@@ -71,7 +115,7 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
   const sb = createAnonClient();
   const { data: live } = await sb
     .from("live_now")
-    .select("uid, room_id, title, cover, online, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level, deleted_at)")
+    .select("uid, room_id, title, cover, keyframe, tags, online, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level, deleted_at)")
     .eq("room_id", roomId)
     .maybeSingle<StarRow & { bili_streamer: StarRow["bili_streamer"] & { deleted_at: string | null } }>();
 
@@ -113,7 +157,18 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
     face: base.face,
     fans: base.fans,
     level: base.level,
-    live: fresh ? { title: live.title, cover: live.cover, online: live.online, area: live.area, started_at: live.started_at, seen_at: live.seen_at } : null,
+    live: fresh
+      ? {
+          title: live.title,
+          cover: live.cover,
+          keyframe: live.keyframe ?? "",
+          tags: live.tags ?? [],
+          online: live.online,
+          area: live.area,
+          started_at: live.started_at,
+          seen_at: live.seen_at,
+        }
+      : null,
     handle: claimed?.handle ?? null,
     now: Date.now(),
   };
@@ -129,4 +184,8 @@ export function formatFans(n: number | null): string {
 export function minutesLive(startedAt: string | null, now: number): number | null {
   if (!startedAt) return null;
   return Math.max(0, Math.round((now - Date.parse(startedAt)) / 60000));
+}
+
+export function formatLive(mins: number): string {
+  return mins >= 60 ? `${Math.floor(mins / 60)} 小时 ${mins % 60} 分` : `${mins} 分`;
 }
