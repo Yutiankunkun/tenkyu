@@ -54,6 +54,58 @@ export async function getClaimed(): Promise<ClaimedMap> {
   return new Map((data ?? []).map((s) => [s.bili_uid, s.handle]));
 }
 
+export type WatchData = {
+  uid: number;
+  room_id: number;
+  uname: string;
+  face: string;
+  fans: number | null;
+  level: number | null;
+  live: { title: string; cover: string; online: number; area: string; started_at: string | null; seen_at: string } | null;
+  handle: string | null;
+  now: number;
+};
+
+/** Everything the watch page needs for one room: streamer facts + live state (if live) + claimed handle. */
+export async function getWatch(roomId: number): Promise<WatchData | null> {
+  const sb = createAnonClient();
+  const { data: live } = await sb
+    .from("live_now")
+    .select("uid, room_id, title, cover, online, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level, deleted_at)")
+    .eq("room_id", roomId)
+    .maybeSingle<StarRow & { bili_streamer: StarRow["bili_streamer"] & { deleted_at: string | null } }>();
+
+  let uid: number;
+  let base: { uname: string; face: string; fans: number | null; level: number | null };
+  if (live && !live.bili_streamer.deleted_at) {
+    uid = live.uid;
+    base = live.bili_streamer;
+  } else {
+    const { data: s } = await sb
+      .from("bili_streamer")
+      .select("uid, uname, face, fans, level, deleted_at")
+      .eq("room_id", roomId)
+      .is("deleted_at", null)
+      .maybeSingle<{ uid: number; uname: string; face: string; fans: number | null; level: number | null }>();
+    if (!s) return null;
+    uid = s.uid;
+    base = s;
+  }
+  const { data: claimed } = await sb.from("streamer").select("handle").eq("bili_uid", uid).eq("status", "active").maybeSingle<{ handle: string }>();
+  const fresh = live && Date.parse(live.seen_at) > Date.now() - STARS_STALE_MIN * 60 * 1000;
+  return {
+    uid,
+    room_id: roomId,
+    uname: base.uname,
+    face: base.face,
+    fans: base.fans,
+    level: base.level,
+    live: fresh ? { title: live.title, cover: live.cover, online: live.online, area: live.area, started_at: live.started_at, seen_at: live.seen_at } : null,
+    handle: claimed?.handle ?? null,
+    now: Date.now(),
+  };
+}
+
 export function formatFans(n: number | null): string {
   if (n === null) return "";
   if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, "")} 万粉`;

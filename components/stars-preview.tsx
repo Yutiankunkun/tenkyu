@@ -25,7 +25,7 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((r) => (
           <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
-            <a href={`https://live.bilibili.com/${r.room_id}`} target="_blank" rel="noopener noreferrer" className="block">
+            <Link href={`/watch/${r.room_id}`} className="block">
               <div className="aspect-video bg-fg/5">
                 {r.cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -42,7 +42,7 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
                   </div>
                 </div>
               </div>
-            </a>
+            </Link>
           </li>
         ))}
       </ul>

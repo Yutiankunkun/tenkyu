@@ -2,7 +2,6 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
-import { LivePeek } from "@/components/live-peek";
 import { BAND_LIMIT, LEVEL_GATE, formatFans, getClaimed, getStars, minutesLive, type Band } from "@/lib/stars";
 
 export const metadata = {
@@ -109,14 +108,14 @@ async function Board({ searchParams }: { searchParams: SP }) {
             const mins = minutesLive(r.started_at, now);
             return (
               <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
-                <a href={`https://live.bilibili.com/${r.room_id}`} target="_blank" rel="noopener noreferrer" className="block">
+                <Link href={`/watch/${r.room_id}`} className="block">
                   <div className="aspect-video bg-fg/5">
                     {r.cover ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
-                </a>
+                </Link>
                 <div className="flex gap-3 p-3">
                   <Avatar src={r.bili_streamer.face} name={r.bili_streamer.uname} color="#5b8def" size={40} />
                   <div className="min-w-0 flex-1">
@@ -138,7 +137,9 @@ async function Board({ searchParams }: { searchParams: SP }) {
                 </div>
                 <div className="flex items-center justify-between border-t border-line px-3 py-2 text-xs">
                   <span className="flex items-center gap-3">
-                    <LivePeek roomId={r.room_id} name={r.bili_streamer.uname} title={r.title} className="font-medium text-accent hover:underline" />
+                    <Link href={`/watch/${r.room_id}`} className="font-medium text-accent hover:underline">
+                      在天球看
+                    </Link>
                     <a href={`https://live.bilibili.com/${r.room_id}`} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
                       去直播间 →
                     </a>
