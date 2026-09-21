@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
+import { LivePeek } from "@/components/live-peek";
 import { BAND_LIMIT, LEVEL_GATE, formatFans, getClaimed, getStars, minutesLive, type Band } from "@/lib/stars";
 
 export const metadata = {
@@ -136,9 +137,12 @@ async function Board({ searchParams }: { searchParams: SP }) {
                   </div>
                 </div>
                 <div className="flex items-center justify-between border-t border-line px-3 py-2 text-xs">
-                  <a href={`https://live.bilibili.com/${r.room_id}`} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
-                    去直播间 →
-                  </a>
+                  <span className="flex items-center gap-3">
+                    <LivePeek roomId={r.room_id} name={r.bili_streamer.uname} title={r.title} className="font-medium text-accent hover:underline" />
+                    <a href={`https://live.bilibili.com/${r.room_id}`} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                      去直播间 →
+                    </a>
+                  </span>
                   {handle ? (
                     <Link href={`/${handle}`} className="text-muted hover:text-fg">
                       看她的日程
