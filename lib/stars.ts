@@ -45,7 +45,7 @@ export async function fetchBandRows(band: Band): Promise<StarRow[]> {
   return (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [] }));
 }
 
-export type StarsQuery = { band: Band; topic: Topic | null; q: string | null; sort: Sort; page: number };
+export type StarsQuery = { band: Band; topic: Topic | null; q: string | null; sort: Sort; page: number; size?: number };
 
 export type StarsResult = {
   rows: StarRow[]; // current page only
@@ -58,17 +58,53 @@ export type StarsResult = {
 };
 
 const norm = (s: string) => s.toLowerCase();
+const escapeLike = (s: string) => s.replace(/[\%_]/g, (c) => "\\" + c);
 
-export async function getStars(query: StarsQuery): Promise<StarsResult> {
+type StarsPageRpc = { total: number; topics: { topic: Topic; n: number }[]; updated_at: string | null; rows: StarRow[] };
+
+/** One database call (migration 0006). Cached briefly per distinct query. */
+async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResult | null> {
+  "use cache";
+  cacheTag("stars");
+  cacheLife({ stale: 30, revalidate: 60, expire: 300 });
+
+  const sb = createAnonClient();
+  const { data, error } = await sb.rpc("stars_page", {
+    p_fans_lt: BAND_LIMIT[query.band],
+    p_topic: query.topic,
+    p_q: query.q ? escapeLike(query.q) : null,
+    p_sort: query.sort,
+    p_page: Math.max(1, query.page),
+    p_size: size,
+    p_stale_minutes: STARS_STALE_MIN,
+    p_level_gate: LEVEL_GATE,
+  });
+  if (error) {
+    if (error.code === "PGRST202" || /stars_page/.test(error.message)) return null; // migration not applied yet
+    throw error;
+  }
+  const r = data as StarsPageRpc;
+  const pages = Math.max(1, Math.ceil(r.total / size));
+  return {
+    rows: (r.rows ?? []).map((x) => ({ ...x, tags: x.tags ?? [] })),
+    total: r.total,
+    page: Math.min(Math.max(1, query.page), pages),
+    pages,
+    topics: r.topics ?? [],
+    updatedAt: r.updated_at,
+    now: Date.now(),
+  };
+}
+
+/** In-memory fallback over the cached band fetch (used until 0006 is applied). */
+async function starsPageInMemory(query: StarsQuery, size: number): Promise<StarsResult> {
   const all = await fetchBandRows(query.band);
-
   const topicCount = new Map<Topic, number>();
   for (const r of all) {
     const t = topicOf(r.area);
     topicCount.set(t, (topicCount.get(t) ?? 0) + 1);
   }
   const topics = TOPICS.filter((t) => topicCount.has(t)).map((t) => ({ topic: t, n: topicCount.get(t)! }));
-
   let rows = all;
   if (query.topic) rows = rows.filter((r) => topicOf(r.area) === query.topic);
   if (query.q) {
@@ -80,12 +116,16 @@ export async function getStars(query: StarsQuery): Promise<StarsResult> {
   const byStart = (a: StarRow, b: StarRow) => (b.started_at ?? "").localeCompare(a.started_at ?? "");
   if (query.sort === "small") rows = [...rows].sort((a, b) => (a.bili_streamer.fans ?? 1e9) - (b.bili_streamer.fans ?? 1e9) || byStart(a, b));
   else rows = [...rows].sort(byStart);
-
   const total = rows.length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / size));
   const page = Math.min(Math.max(1, query.page), pages);
   const updatedAt = all.length ? all.map((r) => r.seen_at).sort().at(-1)! : null;
-  return { rows: rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total, page, pages, topics, updatedAt, now: Date.now() };
+  return { rows: rows.slice((page - 1) * size, page * size), total, page, pages, topics, updatedAt, now: Date.now() };
+}
+
+export async function getStars(query: StarsQuery): Promise<StarsResult> {
+  const size = query.size ?? PAGE_SIZE;
+  return (await starsPageRpc(query, size)) ?? starsPageInMemory(query, size);
 }
 
 /** Live rows for specific uids (favourites view), gate applied. */

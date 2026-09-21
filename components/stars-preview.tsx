@@ -7,9 +7,9 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
   let rows: Awaited<ReturnType<typeof getStars>>["rows"] = [];
   let total = 0;
   try {
-    const data = await getStars({ band: "small", topic: null, q: null, sort: "new", page: 1 });
+    const data = await getStars({ band: "small", topic: null, q: null, sort: "new", page: 1, size: limit });
     total = data.total;
-    rows = data.rows.slice(0, limit);
+    rows = data.rows;
   } catch {
     return null;
   }
