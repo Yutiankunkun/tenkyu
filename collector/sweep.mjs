@@ -223,11 +223,18 @@ if (s.ok && s.rooms.size > 0) {
   const rows = [...s.rooms.values()];
   await rpc("upsert_bili_streamers", { rows: rows.map(({ uid, uname, face, room_id }) => ({ uid, uname, face, room_id })) });
   upserted = await rpc("upsert_live_now", { rows: rows.map(({ uid, room_id, title, cover, online, area }) => ({ uid, room_id, title, cover, online, area })) });
-  const stale = await rest(`live_now?seen_at=lt.${iso(Date.now() - STALE_MIN * 60 * 1000)}`, {
-    method: "DELETE",
-    prefer: "return=representation",
-  });
-  removed = Array.isArray(stale) ? stale.length : 0;
+  // Rooms not seen for STALE_MIN minutes: archived into live_session, then dropped (one RPC).
+  // Until migration 0003 is applied the RPC does not exist → plain delete, no history.
+  try {
+    removed = (await rpc("close_stale_live", { stale_minutes: STALE_MIN })) ?? 0;
+  } catch (e) {
+    console.log(`close_stale_live unavailable (${e instanceof Error ? e.message.slice(0, 80) : e}); deleting stale rows without archiving`);
+    const stale = await rest(`live_now?seen_at=lt.${iso(Date.now() - STALE_MIN * 60 * 1000)}`, {
+      method: "DELETE",
+      prefer: "return=representation",
+    });
+    removed = Array.isArray(stale) ? stale.length : 0;
+  }
 }
 const b = await backfill();
 const f = await refreshFans();
