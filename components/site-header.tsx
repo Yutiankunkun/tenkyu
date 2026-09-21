@@ -16,6 +16,9 @@ export function SiteHeader() {
           <Link href="/w" className={item}>
             合并日程
           </Link>
+          <Link href="/stars" className={item}>
+            观星台
+          </Link>
           <Link href="/apply" className={item}>
             入驻
           </Link>
