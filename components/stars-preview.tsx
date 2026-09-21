@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
-import { formatFans, getStars } from "@/lib/stars";
+import { formatFans, getStars, topicOf } from "@/lib/stars";
 
 /** Home teaser: a few currently-live small VTubers from 观星台. Server component; call behind Suspense + connection(). */
 export async function StarsPreview({ limit = 6 }: { limit?: number }) {
   let rows: Awaited<ReturnType<typeof getStars>>["rows"] = [];
   let total = 0;
   try {
-    const data = await getStars({ band: "small", area: null, tag: null, q: null, sort: "new" });
-    total = data.rows.length;
+    const data = await getStars({ band: "small", topic: null, q: null, sort: "new", page: 1 });
+    total = data.total;
     rows = data.rows.slice(0, limit);
   } catch {
     return null;
@@ -27,9 +27,9 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
           <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
             <Link href={`/watch/${r.room_id}`} className="block">
               <div className="aspect-video bg-fg/5">
-                {r.keyframe || r.cover ? (
+                {r.cover ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.keyframe || r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
+                  <img src={r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
                 ) : null}
               </div>
               <div className="flex items-center gap-2 p-2.5">
@@ -37,7 +37,7 @@ export async function StarsPreview({ limit = 6 }: { limit?: number }) {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium">{r.bili_streamer.uname}</div>
                   <div className="truncate text-xs text-muted">
-                    {r.area ? `${r.area} · ` : ""}
+                    {r.area ? `${topicOf(r.area)} · ` : ""}
                     {formatFans(r.bili_streamer.fans)}
                   </div>
                 </div>

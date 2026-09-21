@@ -5,10 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { FAVS_KEY, FavButton, parseFavs } from "@/components/fav-button";
 import { useLocalString } from "@/lib/local-store";
-import { formatFans, formatLive, minutesLive, type StarRow } from "@/lib/stars";
+import { formatFans, formatLive, minutesLive, topicOf, type StarRow } from "@/lib/stars";
 
 type Props = {
-  rows: StarRow[];
+  rows: StarRow[]; // one page
+  total: number;
+  page: number;
+  pages: number;
+  pageHref: (p: number) => string;
   claimed: [number, string][]; // uid → handle
   now: number;
   updatedAt: string | null;
@@ -16,38 +20,37 @@ type Props = {
 
 type Offline = { uid: number; uname: string; face: string; room_id: number | null; fans: number | null; last_seen_at: string };
 
-const PAGE = 60;
-
 /** 观星台 card grid. Client-side so ♡ and 「只看收藏」 work without an account. */
-export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
+export function StarsGrid({ rows, total, page, pages, pageHref, claimed, now, updatedAt }: Props) {
   const claimedMap = useMemo(() => new Map(claimed), [claimed]);
   const favs = parseFavs(useLocalString(FAVS_KEY));
-  const favSet = useMemo(() => new Set(favs), [favs]);
   const [favsOnly, setFavsOnly] = useState(false);
-  const [page, setPage] = useState(1);
+  const [favLive, setFavLive] = useState<StarRow[] | null>(null);
   const [offline, setOffline] = useState<Offline[]>([]);
 
-  const shown = favsOnly ? rows.filter((r) => favSet.has(r.uid)) : rows;
-  const total = shown.length;
-  const pageRows = favsOnly ? shown : shown.slice((page - 1) * PAGE, page * PAGE);
-
-  // Favourites that are not live right now: look them up for a compact list.
-  const liveUids = useMemo(() => new Set(rows.map((r) => r.uid)), [rows]);
-  const offlineKey = favsOnly ? favs.filter((u) => !liveUids.has(u)).join(",") : "";
+  // Favourites mode: live rows + offline facts for the favourite uids (two small API calls).
+  const favKey = favsOnly ? favs.join(",") : "";
   useEffect(() => {
-    if (!offlineKey) return;
+    if (!favKey) return;
     let cancelled = false;
-    fetch(`/api/streamers?uids=${offlineKey}`)
-      .then((r) => (r.ok ? r.json() : { streamers: [] }))
-      .then((j) => {
-        if (!cancelled) setOffline((j.streamers ?? []) as Offline[]);
+    Promise.all([
+      fetch(`/api/live?uids=${favKey}`).then((r) => (r.ok ? r.json() : { rows: [] })),
+      fetch(`/api/streamers?uids=${favKey}`).then((r) => (r.ok ? r.json() : { streamers: [] })),
+    ])
+      .then(([live, off]) => {
+        if (cancelled) return;
+        const liveRows = (live.rows ?? []) as StarRow[];
+        const liveUids = new Set(liveRows.map((r) => r.uid));
+        setFavLive(liveRows);
+        setOffline(((off.streamers ?? []) as Offline[]).filter((s) => !liveUids.has(s.uid)));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [offlineKey]);
+  }, [favKey]);
 
+  const shown = favsOnly ? (favLive ?? []) : rows;
   const chip = (on: boolean) =>
     `rounded-full border px-3 py-1 text-sm ${on ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`;
 
@@ -55,7 +58,7 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          {total} 位在播
+          {favsOnly ? `${shown.length} 位收藏在播` : `${total} 位在播`}
           {updatedAt
             ? ` · 更新于 ${new Date(updatedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Shanghai" })}（北京时间）`
             : ""}
@@ -65,11 +68,13 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
         </button>
       </div>
 
-      {pageRows.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="text-muted">
           {favsOnly
             ? favs.length
-              ? "收藏的主播现在都没在播。"
+              ? favLive === null
+                ? "加载中…"
+                : "收藏的主播现在都没在播。"
               : "还没有收藏。在卡片或观看页点 ♡ 就会出现在这里，只保存在这个浏览器里。"
             : updatedAt
               ? "这个筛选下现在没有人在播。"
@@ -77,16 +82,16 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {pageRows.map((r) => {
+          {shown.map((r) => {
             const handle = claimedMap.get(r.uid);
             const mins = minutesLive(r.started_at, now);
             return (
               <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
                 <Link href={`/watch/${r.room_id}`} className="block">
                   <div className="aspect-video bg-fg/5">
-                    {r.keyframe || r.cover ? (
+                    {r.cover ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.keyframe || r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
+                      <img src={r.cover} alt="" referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                 </Link>
@@ -105,19 +110,10 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
                     </div>
                     <div className="truncate text-sm text-fg/80">{r.title}</div>
                     <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted">
-                      {r.area ? <span>{r.area}</span> : null}
+                      <span>{topicOf(r.area)}</span>
                       <span>{formatFans(r.bili_streamer.fans)}</span>
                       {mins !== null ? <span>已播 {formatLive(mins)}</span> : null}
                     </div>
-                    {r.tags.length ? (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {r.tags.slice(0, 4).map((t) => (
-                          <Link key={t} href={`/stars?tag=${encodeURIComponent(t)}`} className="rounded-full border border-line px-1.5 py-0.5 text-[11px] text-muted hover:text-fg">
-                            {t}
-                          </Link>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
                   <FavButton uid={r.uid} name={r.bili_streamer.uname} size="sm" />
                 </div>
@@ -134,11 +130,7 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
                     <Link href={`/${handle}`} className="text-muted hover:text-fg">
                       看她的日程
                     </Link>
-                  ) : (
-                    <Link href="/apply" className="text-muted hover:text-fg">
-                      这是你？申请入驻
-                    </Link>
-                  )}
+                  ) : null}
                 </div>
               </li>
             );
@@ -172,17 +164,25 @@ export function StarsGrid({ rows, claimed, now, updatedAt }: Props) {
         </section>
       ) : null}
 
-      {!favsOnly && total > PAGE ? (
+      {!favsOnly && pages > 1 ? (
         <nav className="flex items-center justify-center gap-3 text-sm">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="text-muted hover:text-fg disabled:opacity-40">
-            ← 上一页
-          </button>
+          {page > 1 ? (
+            <Link href={pageHref(page - 1)} className="text-muted hover:text-fg">
+              ← 上一页
+            </Link>
+          ) : (
+            <span className="text-muted opacity-40">← 上一页</span>
+          )}
           <span className="text-muted">
-            {page} / {Math.ceil(total / PAGE)}
+            {page} / {pages}
           </span>
-          <button type="button" disabled={page * PAGE >= total} onClick={() => setPage((p) => p + 1)} className="text-muted hover:text-fg disabled:opacity-40">
-            下一页 →
-          </button>
+          {page < pages ? (
+            <Link href={pageHref(page + 1)} className="text-muted hover:text-fg">
+              下一页 →
+            </Link>
+          ) : (
+            <span className="text-muted opacity-40">下一页 →</span>
+          )}
         </nav>
       ) : null}
     </div>

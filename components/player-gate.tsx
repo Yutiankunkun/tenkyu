@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = { roomId: number; name: string; poster: string };
 
-/** Click-to-play: the official Bilibili embed is only mounted after the viewer presses ▶. */
+/**
+ * Click-to-play: the official Bilibili embed is only mounted after the viewer presses ▶.
+ * With Cache Components, a route you navigate away from stays mounted (hidden) for
+ * instant back-navigation — so the player must unmount itself when its effects are
+ * cleaned up, or the audio keeps playing on the next page.
+ */
 export function PlayerGate({ roomId, name, poster }: Props) {
   const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!playing) return;
+    return () => setPlaying(false); // route hidden / unmounted → stop the stream
+  }, [playing]);
+
   if (playing) {
     return (
       <iframe

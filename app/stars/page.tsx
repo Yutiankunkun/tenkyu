@@ -2,14 +2,14 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { StarsGrid } from "@/components/stars-grid";
-import { BAND_LIMIT, LEVEL_GATE, SORT_LABEL, getClaimed, getStars, type Band, type Sort } from "@/lib/stars";
+import { BAND_LIMIT, LEVEL_GATE, SORT_LABEL, TOPICS, getClaimed, getStars, type Band, type Sort, type Topic } from "@/lib/stars";
 
 export const metadata = {
   title: "观星台",
   description: "现在在播的小体量 VTuber。只收账号等级 3 级以上的主播。",
 };
 
-type SP = Promise<{ band?: string; area?: string; tag?: string; q?: string; sort?: string }>;
+type SP = Promise<{ band?: string; topic?: string; q?: string; sort?: string; p?: string }>;
 
 export default function StarsPage({ searchParams }: { searchParams: SP }) {
   return (
@@ -35,13 +35,14 @@ export default function StarsPage({ searchParams }: { searchParams: SP }) {
 }
 
 const parseBand = (v: string | undefined): Band => (v === "new" || v === "all" ? v : "small");
-const parseSort = (v: string | undefined): Sort => (v === "hot" || v === "small" ? v : "new");
+const parseSort = (v: string | undefined): Sort => (v === "small" ? v : "new");
+const parseTopic = (v: string | undefined): Topic | null => (TOPICS as readonly string[]).includes(v ?? "") ? (v as Topic) : null;
 const clean = (v: string | undefined, max: number) => (v ? v.trim().slice(0, max) : "") || null;
 
 async function Board({ searchParams }: { searchParams: SP }) {
   await connection();
   const sp = await searchParams;
-  const query = { band: parseBand(sp.band), area: clean(sp.area, 20), tag: clean(sp.tag, 20), q: clean(sp.q, 40), sort: parseSort(sp.sort) };
+  const query = { band: parseBand(sp.band), topic: parseTopic(sp.topic), q: clean(sp.q, 40), sort: parseSort(sp.sort), page: Number(sp.p ?? 1) || 1 };
 
   let data: Awaited<ReturnType<typeof getStars>>;
   let claimed: Awaited<ReturnType<typeof getClaimed>>;
@@ -52,13 +53,13 @@ async function Board({ searchParams }: { searchParams: SP }) {
   }
 
   const href = (next: Partial<typeof query>) => {
-    const n = { ...query, ...next };
+    const n = { ...query, page: 1, ...next };
     const p = new URLSearchParams();
     if (n.band !== "small") p.set("band", n.band);
-    if (n.area) p.set("area", n.area);
-    if (n.tag) p.set("tag", n.tag);
+    if (n.topic) p.set("topic", n.topic);
     if (n.q) p.set("q", n.q);
     if (n.sort !== "new") p.set("sort", n.sort);
+    if (n.page > 1) p.set("p", String(n.page));
     const s = p.toString();
     return s ? `/stars?${s}` : "/stars";
   };
@@ -67,26 +68,24 @@ async function Board({ searchParams }: { searchParams: SP }) {
 
   return (
     <div className="space-y-4">
-      {/* search */}
       <form action="/stars" method="get" className="flex gap-2">
         {query.band !== "small" ? <input type="hidden" name="band" value={query.band} /> : null}
         {query.sort !== "new" ? <input type="hidden" name="sort" value={query.sort} /> : null}
         <input
           name="q"
           defaultValue={query.q ?? ""}
-          placeholder="搜主播、标题或标签"
+          placeholder="搜主播或标题"
           maxLength={40}
           className="w-full max-w-md rounded-md border border-line bg-bg px-3 py-2 text-sm"
         />
         <button className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">搜索</button>
-        {query.q || query.tag || query.area ? (
-          <Link href={href({ q: null, tag: null, area: null })} className="self-center text-sm text-muted hover:text-fg">
+        {query.q || query.topic ? (
+          <Link href={href({ q: null, topic: null })} className="self-center text-sm text-muted hover:text-fg">
             清除
           </Link>
         ) : null}
       </form>
 
-      {/* band + sort */}
       <div className="flex flex-wrap items-center gap-2">
         {(
           [
@@ -107,34 +106,29 @@ async function Board({ searchParams }: { searchParams: SP }) {
         ))}
       </div>
 
-      {/* area */}
-      {data.areas.length > 1 ? (
+      {data.topics.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2">
-          {[null, ...data.areas].map((a) => (
-            <Link key={a ?? "_all"} href={href({ area: a })} className={chip(query.area === a)}>
-              {a ?? "全部分区"}
+          <Link href={href({ topic: null })} className={chip(query.topic === null)}>
+            全部
+          </Link>
+          {data.topics.map(({ topic, n }) => (
+            <Link key={topic} href={href({ topic })} className={chip(query.topic === topic)}>
+              {topic} <span className="opacity-60">{n}</span>
             </Link>
           ))}
         </div>
       ) : null}
 
-      {/* tags */}
-      {data.topTags.length ? (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted">标签</span>
-          {data.topTags.map((t) => (
-            <Link
-              key={t}
-              href={href({ tag: query.tag === t ? null : t })}
-              className={`rounded-full border px-2 py-0.5 text-xs ${query.tag === t ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:text-fg"}`}
-            >
-              {t}
-            </Link>
-          ))}
-        </div>
-      ) : null}
-
-      <StarsGrid rows={data.rows} claimed={[...claimed.entries()]} now={data.now} updatedAt={data.updatedAt} />
+      <StarsGrid
+        rows={data.rows}
+        total={data.total}
+        page={data.page}
+        pages={data.pages}
+        pageHref={(p) => href({ page: p })}
+        claimed={[...claimed.entries()]}
+        now={data.now}
+        updatedAt={data.updatedAt}
+      />
     </div>
   );
 }

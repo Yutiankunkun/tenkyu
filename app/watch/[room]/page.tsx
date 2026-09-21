@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { FavButton } from "@/components/fav-button";
 import { PlayerGate } from "@/components/player-gate";
-import { formatFans, formatLive, getWatch, minutesLive } from "@/lib/stars";
+import { formatFans, formatLive, getWatch, minutesLive, topicOf } from "@/lib/stars";
 
 type Params = Promise<{ room: string }>;
 
@@ -48,7 +48,7 @@ async function Watch({ params }: { params: Params }) {
       {/* player: full content width, 16:9, click to play */}
       <div className="aspect-video w-full bg-black sm:overflow-hidden sm:rounded-xl">
         {w.live ? (
-          <PlayerGate roomId={w.room_id} name={w.uname} poster={w.live.keyframe || w.live.cover} />
+          <PlayerGate roomId={w.room_id} name={w.uname} poster={w.live.cover || w.live.keyframe} />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-400">
             <span>现在没有在播</span>
@@ -68,22 +68,12 @@ async function Watch({ params }: { params: Params }) {
               <>
                 直播中
                 {mins !== null ? ` · 已播 ${formatLive(mins)}` : ""}
-                {w.live.area ? ` · ${w.live.area}` : ""}
-                {w.live.online ? ` · 人气 ${w.live.online.toLocaleString("zh-CN")}` : ""}
+                {w.live.area ? ` · ${topicOf(w.live.area)}` : ""}
               </>
             ) : (
               "未在播"
             )}
           </p>
-          {w.live && w.live.tags.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {w.live.tags.map((t) => (
-                <Link key={t} href={`/stars?tag=${encodeURIComponent(t)}`} className="rounded-full border border-line px-2 py-0.5 text-xs text-muted hover:text-fg">
-                  {t}
-                </Link>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         {/* streamer row */}
