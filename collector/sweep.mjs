@@ -12,10 +12,13 @@ const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET ?? "";
 const UA = { "User-Agent": "Mozilla/5.0" };
 const SPACING_MS = 550;
 const MAX_PAGES = 80;
-const BACKFILL = 60;
+const BACKFILL = 400; // upper bound per run; the time budget below is what actually stops it
 const FANS_REFRESH = 100;
 const LEVEL_REFRESH = 40;
 const STALE_MIN = 20;
+const RUN_BUDGET_MS = 6 * 60 * 1000; // workflow timeout is 8 min; leave headroom for refresh + cleanup
+const startedAt = Date.now();
+const overBudget = () => Date.now() - startedAt > RUN_BUDGET_MS;
 
 function need(name) {
   const v = process.env[name];
@@ -107,6 +110,7 @@ async function backfill() {
   let done = 0;
   let deleted = 0;
   for (const { uid } of uids) {
+    if (overBudget()) break; // the next run continues where this one stopped
     const card = await bili(`https://api.bilibili.com/x/web-interface/card?mid=${uid}`);
     await sleep(SPACING_MS);
     if (card.code === -1 || card.code === -2) break; // risk control / network: stop this phase
