@@ -11,7 +11,7 @@ const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET ?? "";
 
 const UA = { "User-Agent": "Mozilla/5.0" };
 const SPACING_MS = 550;
-const MAX_PAGES = 80;
+const MAX_PAGES = 120; // evening peak exceeded 80 pages (2377 rooms) on 2026-09-21
 const BACKFILL = 400; // upper bound per run; the time budget below is what actually stops it
 const FANS_REFRESH = 100;
 const LEVEL_REFRESH = 40;
