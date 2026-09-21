@@ -12,7 +12,7 @@ type Props = {
   total: number;
   page: number;
   pages: number;
-  pageHref: (p: number) => string;
+  pageBase: string; // list URL without the page param
   claimed: [number, string][]; // uid → handle
   now: number;
   updatedAt: string | null;
@@ -21,7 +21,8 @@ type Props = {
 type Offline = { uid: number; uname: string; face: string; room_id: number | null; fans: number | null; last_seen_at: string };
 
 /** 观星台 card grid. Client-side so ♡ and 「只看收藏」 work without an account. */
-export function StarsGrid({ rows, total, page, pages, pageHref, claimed, now, updatedAt }: Props) {
+export function StarsGrid({ rows, total, page, pages, pageBase, claimed, now, updatedAt }: Props) {
+  const pageHref = (p: number) => (p <= 1 ? pageBase : `${pageBase}${pageBase.includes("?") ? "&" : "?"}p=${p}`);
   const claimedMap = useMemo(() => new Map(claimed), [claimed]);
   const favs = parseFavs(useLocalString(FAVS_KEY));
   const [favsOnly, setFavsOnly] = useState(false);

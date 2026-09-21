@@ -124,7 +124,7 @@ async function Board({ searchParams }: { searchParams: SP }) {
         total={data.total}
         page={data.page}
         pages={data.pages}
-        pageHref={(p) => href({ page: p })}
+        pageBase={href({ page: 1 })}
         claimed={[...claimed.entries()]}
         now={data.now}
         updatedAt={data.updatedAt}
