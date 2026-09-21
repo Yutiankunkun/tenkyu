@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { FAVS_KEY, FavButton, parseFavs } from "@/components/fav-button";
 import { useLocalString } from "@/lib/local-store";
-import { formatFans, formatLive, minutesLive, topicOf, type StarRow } from "@/lib/stars";
+import { formatFans, formatLive, minutesLive, topicOf, type StarRow } from "@/lib/stars-shared";
 
 type Props = {
   rows: StarRow[]; // one page
