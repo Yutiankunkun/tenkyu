@@ -1,9 +1,17 @@
 name: collector
 
+# Runs as a self-chaining loop: each run dispatches the next one ~10 min after
+# its own start (GitHub's `schedule` trigger proved unreliable — it never fired
+# during the first 3 h on 2026-09-21). The cron below stays as a backup only;
+# the concurrency group keeps at most one run in flight plus one pending.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
 
 concurrency:
   group: collector
@@ -12,8 +20,11 @@ concurrency:
 jobs:
   sweep:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
+    env:
+      INTERVAL_SECONDS: "600"
     steps:
+      - run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -24,3 +35,12 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           REVALIDATE_URL: https://tenkyu.app/api/revalidate
           REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+      - name: chain next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          elapsed=$(( $(date +%s) - JOB_START ))
+          wait=$(( INTERVAL_SECONDS - elapsed ))
+          if [ "$wait" -gt 0 ]; then echo "sleeping ${wait}s to keep a ${INTERVAL_SECONDS}s cadence"; sleep "$wait"; fi
+          gh workflow run collector.yml --ref main -R "$GITHUB_REPOSITORY"
