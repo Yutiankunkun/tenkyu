@@ -151,6 +151,14 @@ async function fetchDetails(uids) {
 }
 
 // ---------------------------------------------------------------- 2. profiles
+// Level + fans come from the LIVE host (api.live.bilibili.com), which tolerated 2 000+ calls at
+// 0.15 s from a home IP on 2026-09-22, while api.bilibili.com's `card` went -352 after ~330.
+//   get_anchor_in_room?roomid=  → info.platform_user_level (= account level; 433/433 agreed
+//                                 with card), uname, face. Works for offline rooms. A bad room
+//                                 id returns SOME account (room 1 = 哔哩哔哩直播) → verify info.uid.
+//   Master/info?uid=            → follower_num (= relation/stat follower, verified), master_level,
+//                                 uname, face. Unknown uid → code 0 with uname "".
+// `card` stays as the fallback for rows without a room id (or when the anchor uid mismatches).
 function deletedFromCard(j) {
   // -404 「啥都木有」 = no such user; a deleted account also shows as name 账号已注销.
   if (j.code === -404) return true;
@@ -158,33 +166,78 @@ function deletedFromCard(j) {
   return name === "账号已注销";
 }
 
-async function backfill() {
-  const uids = await rest(`bili_streamer?select=uid&level=is.null&deleted_at=is.null&order=first_seen_at.desc&limit=${BACKFILL}`);
-  let done = 0;
-  let deleted = 0;
-  for (const { uid } of uids) {
-    if (overBudget()) break; // the next run continues where this one stopped
+/**
+ * Profile patch for one streamer. Returns null on risk control / network (stop the phase),
+ * `{ retry: true }` when nothing usable came back (leave the row for a later run),
+ * otherwise `{ patch, deleted }`.
+ */
+async function fetchProfile(uid, room_id) {
+  const patch = { level_fetched_at: iso(Date.now()) };
+  let gotLevel = false;
+  if (room_id) {
+    const a = await bili(`https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid=${room_id}`);
+    await sleep(SPACING_MS);
+    if (a.code === -1 || a.code === -2) return null;
+    const info = a.code === 0 ? a.data?.info : null;
+    if (info && Number(info.uid) === Number(uid) && typeof info.platform_user_level === "number") {
+      patch.level = info.platform_user_level;
+      if (info.uname) patch.uname = info.uname;
+      if (info.face) patch.face = info.face;
+      gotLevel = true;
+    }
+  }
+  if (!gotLevel) {
     const card = await bili(`https://api.bilibili.com/x/web-interface/card?mid=${uid}`);
     await sleep(SPACING_MS);
-    if (card.code === -1 || card.code === -2) break; // risk control / network: stop this phase
-    const patch = { level_fetched_at: iso(Date.now()) };
+    if (card.code === -1 || card.code === -2) return null;
     if (deletedFromCard(card)) {
       patch.deleted_at = iso(Date.now());
-      deleted++;
-    } else if (card.code === 0) {
-      const c = card.data.card;
-      patch.level = c.level_info?.current_level ?? null;
-      patch.fans = typeof c.fans === "number" ? c.fans : null;
-      patch.fans_fetched_at = iso(Date.now());
-      if (c.name) patch.uname = c.name;
-      if (c.face) patch.face = c.face;
-      const m = await bili(`https://api.live.bilibili.com/live_user/v1/Master/info?uid=${uid}`);
-      await sleep(SPACING_MS);
-      if (m.code === 0) patch.master_level = m.data?.exp?.master_level?.level ?? null;
-    } else {
-      continue; // transient; leave level null so a later run retries
+      return { patch, deleted: true };
     }
-    await rest(`bili_streamer?uid=eq.${uid}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+    if (card.code !== 0) return { retry: true };
+    const c = card.data.card;
+    patch.level = c.level_info?.current_level ?? null;
+    if (typeof c.fans === "number") {
+      patch.fans = c.fans;
+      patch.fans_fetched_at = iso(Date.now());
+    }
+    if (c.name) patch.uname = c.name;
+    if (c.face) patch.face = c.face;
+  }
+  const m = await bili(`https://api.live.bilibili.com/live_user/v1/Master/info?uid=${uid}`);
+  await sleep(SPACING_MS);
+  if (m.code === -1 || m.code === -2) return null;
+  if (m.code === 0) {
+    const d = m.data ?? {};
+    if (d.info?.uname === "账号已注销") {
+      patch.deleted_at = iso(Date.now());
+      return { patch, deleted: true };
+    }
+    if (typeof d.follower_num === "number" && d.info?.uname) {
+      // uname "" means Bilibili knows no such uid; its follower_num 0 is not a measurement.
+      patch.fans = d.follower_num;
+      patch.fans_fetched_at = iso(Date.now());
+    }
+    patch.master_level = d.exp?.master_level?.level ?? null;
+    if (!patch.uname && d.info?.uname) patch.uname = d.info.uname;
+    if (!patch.face && d.info?.face) patch.face = d.info.face;
+  }
+  return { patch, deleted: false };
+}
+
+async function backfill() {
+  const rows = await rest(
+    `bili_streamer?select=uid,room_id&level=is.null&deleted_at=is.null&order=first_seen_at.desc&limit=${BACKFILL}`,
+  );
+  let done = 0;
+  let deleted = 0;
+  for (const { uid, room_id } of rows) {
+    if (overBudget()) break; // the next run continues where this one stopped
+    const r = await fetchProfile(uid, room_id);
+    if (r === null) break; // risk control / network: stop this phase
+    if (r.retry) continue; // transient; leave level null so a later run retries
+    if (r.deleted) deleted++;
+    await rest(`bili_streamer?uid=eq.${uid}`, { method: "PATCH", body: r.patch, prefer: "return=minimal" });
     done++;
   }
   return { done, deleted };
@@ -213,32 +266,18 @@ async function refreshFans() {
 
 async function refreshLevels() {
   const since = iso(Date.now() - 7 * 24 * 3600 * 1000);
-  const uids = await rest(
-    `bili_streamer?select=uid&level=not.is.null&deleted_at=is.null&level_fetched_at=lt.${since}&order=level_fetched_at.asc&limit=${LEVEL_REFRESH}`,
+  const rows = await rest(
+    `bili_streamer?select=uid,room_id&level=not.is.null&deleted_at=is.null&level_fetched_at=lt.${since}&order=level_fetched_at.asc&limit=${LEVEL_REFRESH}`,
   );
   let done = 0;
   let deleted = 0;
-  for (const { uid } of uids) {
-    const card = await bili(`https://api.bilibili.com/x/web-interface/card?mid=${uid}`);
-    await sleep(SPACING_MS);
-    if (card.code === -1 || card.code === -2) break;
-    const patch = { level_fetched_at: iso(Date.now()) };
-    if (deletedFromCard(card)) {
-      patch.deleted_at = iso(Date.now());
-      deleted++;
-    } else if (card.code === 0) {
-      const c = card.data.card;
-      patch.level = c.level_info?.current_level ?? null;
-      if (typeof c.fans === "number") {
-        patch.fans = c.fans;
-        patch.fans_fetched_at = iso(Date.now());
-      }
-      if (c.name) patch.uname = c.name;
-      if (c.face) patch.face = c.face;
-    } else {
-      continue;
-    }
-    await rest(`bili_streamer?uid=eq.${uid}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+  for (const { uid, room_id } of rows) {
+    if (overBudget()) break;
+    const r = await fetchProfile(uid, room_id);
+    if (r === null) break;
+    if (r.retry) continue;
+    if (r.deleted) deleted++;
+    await rest(`bili_streamer?uid=eq.${uid}`, { method: "PATCH", body: r.patch, prefer: "return=minimal" });
     done++;
   }
   return { done, deleted };

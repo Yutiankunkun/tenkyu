@@ -17,6 +17,7 @@ async function probe(name, url) {
       if (j.data?.card?.level_info) extra += ` level=${j.data.card.level_info.current_level}`;
       if (j.data?.exp?.master_level) extra += ` master_level=${j.data.exp.master_level.level}`;
       if (j.data?.follower !== undefined) extra += ` follower=${j.data.follower}`;
+      if (j.data?.info?.platform_user_level !== undefined) extra += ` level=${j.data.info.platform_user_level}`;
     } catch {
       extra = text.slice(0, 80);
     }
@@ -31,5 +32,6 @@ await probe(
   "https://api.live.bilibili.com/room/v3/area/getRoomList?platform=web&parent_area_id=9&area_id=0&sort_type=online&page=1&page_size=30",
 );
 await probe("card", "https://api.bilibili.com/x/web-interface/card?mid=46334350");
+await probe("anchor-in-room", "https://api.live.bilibili.com/live_user/v1/UserInfo/get_anchor_in_room?roomid=12958754");
 await probe("master-info", "https://api.live.bilibili.com/live_user/v1/Master/info?uid=46334350");
 await probe("relation-stat", "https://api.bilibili.com/x/relation/stat?vmid=46334350");
