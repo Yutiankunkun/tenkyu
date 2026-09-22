@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { FavButton } from "@/components/fav-button";
+import { OnlineCount } from "@/components/online-count";
 import { PlayerGate } from "@/components/player-gate";
 import { formatFans, formatLive, getWatch, minutesLive, topicOf } from "@/lib/stars";
 
@@ -69,6 +70,7 @@ async function Watch({ params }: { params: Params }) {
                 直播中
                 {mins !== null ? ` · 已播 ${formatLive(mins)}` : ""}
                 {w.live.area ? ` · ${topicOf(w.live.area)}` : ""}
+                <OnlineCount uid={w.uid} room={w.room_id} />
               </>
             ) : (
               "未在播"
@@ -126,7 +128,7 @@ async function Watch({ params }: { params: Params }) {
         )}
 
         <p className="mt-6 text-xs text-muted">
-          官方嵌入播放器，只能看。发弹幕、上舰请去直播间。信息来自 B 站公开接口，约每 10 分钟更新。
+          官方嵌入播放器，只能看。发弹幕、上舰请去直播间。信息来自 B 站公开接口，约每 10 分钟更新；「在线」是登录用户数，约每分钟更新。
           <Link href="/stars" className="ml-2 underline">
             回观星台
           </Link>
