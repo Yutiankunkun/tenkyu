@@ -11,12 +11,12 @@ const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET ?? "";
 
 const UA = { "User-Agent": "Mozilla/5.0" };
 const SPACING_MS = 550;
-const MAX_PAGES = 120; // evening peak exceeded 80 pages (2377 rooms) on 2026-09-21
+const MAX_PAGES = 160; // evening peak filled all 120 pages (3582 rooms) on 2026-09-22
 const BACKFILL = 400; // upper bound per run; the time budget below is what actually stops it
 const FANS_REFRESH = 100;
 const LEVEL_REFRESH = 40;
 const STALE_MIN = 20;
-const RUN_BUDGET_MS = 6 * 60 * 1000; // workflow timeout is 8 min; leave headroom for refresh + cleanup
+const RUN_BUDGET_MS = 4 * 60 * 1000; // backfill stops here; refresh + cleanup follow (~1–2 min); workflow timeout 12 min
 const startedAt = Date.now();
 const overBudget = () => Date.now() - startedAt > RUN_BUDGET_MS;
 
