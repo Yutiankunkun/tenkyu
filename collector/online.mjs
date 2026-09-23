@@ -84,12 +84,20 @@ async function flush(rows) {
   }
 }
 
+// PostgREST caps a response at 1 000 rows regardless of `limit`, so page explicitly: the
+// evening peak has ~2 500 gated rooms (first run 2026-09-24 saw exactly 1 000).
 const since = new Date(Date.now() - STALE_MIN * 60 * 1000).toISOString();
-const rooms = await rest(
-  `live_now?select=uid,room_id,online_fetched_at,bili_streamer!inner(level,deleted_at)` +
-    `&seen_at=gt.${since}&bili_streamer.level=gte.${LEVEL_GATE}&bili_streamer.deleted_at=is.null` +
-    `&order=online_fetched_at.asc.nullsfirst&limit=5000`,
-);
+const PAGE = 1000;
+const rooms = [];
+for (let offset = 0; ; offset += PAGE) {
+  const chunk = await rest(
+    `live_now?select=uid,room_id,online_fetched_at,bili_streamer!inner(level,deleted_at)` +
+      `&seen_at=gt.${since}&bili_streamer.level=gte.${LEVEL_GATE}&bili_streamer.deleted_at=is.null` +
+      `&order=online_fetched_at.asc.nullsfirst,uid.asc&limit=${PAGE}&offset=${offset}`,
+  );
+  rooms.push(...chunk);
+  if (chunk.length < PAGE) break;
+}
 
 let visited = 0;
 let written = 0;
