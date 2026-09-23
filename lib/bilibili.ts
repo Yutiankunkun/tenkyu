@@ -39,10 +39,10 @@ export async function fetchLiveProfile(uid: number): Promise<BiliLiveProfile> {
   };
 }
 
-// Logged-in viewers currently in a room — the figure Bilibili shows above the 高能榜.
+// Logged-in viewers currently in a room — the figure Bilibili shows above the room's contribution rank.
 // Verified 2026-09-22: 2 024/2 025 live rooms answered at 0.15 s spacing from a home IP,
-// GitHub runners reach it too. Offline room → 0. This is NOT 同接 (guests are excluded),
-// so the UI says 「在线」, never 「正在观看」. Returns null when the endpoint misbehaves.
+// GitHub runners reach it too. Offline room → 0. This is NOT a concurrent-viewer count (guests are excluded),
+// so the UI wording is "online", never "watching now". Returns null when the endpoint misbehaves.
 export async function fetchOnline(uid: number, roomId: number): Promise<number | null> {
   const url = `https://api.live.bilibili.com/xlive/general-interface/v1/rank/getOnlineGoldRank?ruid=${uid}&roomId=${roomId}&page=1&pageSize=1`;
   const res = await fetch(url, {

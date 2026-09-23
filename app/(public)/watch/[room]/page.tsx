@@ -88,11 +88,6 @@ async function Watch({ params }: { params: Params }) {
               <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="truncate text-base font-semibold hover:underline">
                 {w.uname}
               </a>
-              {w.handle ? (
-                <Link href={`/${w.handle}`} className="rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
-                  已入驻
-                </Link>
-              ) : null}
             </div>
             <div className="text-sm text-muted">
               {formatFans(w.fans)}
@@ -110,26 +105,9 @@ async function Watch({ params }: { params: Params }) {
           </div>
         </div>
 
-        {w.handle ? (
-          <p className="mt-4 text-sm">
-            她在天球维护自己的日程：
-            <Link href={`/${w.handle}`} className="underline">
-              看本周安排
-            </Link>
-          </p>
-        ) : (
-          <p className="mt-4 text-sm text-muted">
-            这是你的直播间？
-            <Link href="/studio/apply" className="underline">
-              申请入驻
-            </Link>
-            ，就能有自己维护的日程页。
-          </p>
-        )}
-
         <p className="mt-6 text-xs text-muted">
           官方嵌入播放器，只能看。发弹幕、上舰请去直播间。信息来自 B 站公开接口，约每 10 分钟更新；「在线」是登录用户数，约每分钟更新。
-          <Link href="/stars" className="ml-2 underline">
+          <Link href="/" className="ml-2 underline">
             回观星台
           </Link>
         </p>

@@ -2,7 +2,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { createAnonClient } from "@/lib/supabase/anon";
 import { fetchLiveProfile, fetchRoomInit } from "@/lib/bilibili";
 
-// 观星台 read model. Gate = account level >= 3, account not deleted, seen in the
+// Observatory read model. Gate = account level >= 3, account not deleted, seen in the
 // last STARS_STALE_MIN minutes. The raw band fetch is cached for a minute so the
 // board and the home teaser do not hit Supabase on every request.
 
@@ -20,8 +20,6 @@ import {
 } from "@/lib/stars-shared";
 
 export * from "@/lib/stars-shared";
-
-export type ClaimedMap = Map<number, string>; // bili_uid → handle
 
 /** Cached raw fetch of every gated live row in a band (no keyframe: cards use covers). */
 export async function fetchBandRows(band: Band): Promise<StarRow[]> {
@@ -146,16 +144,6 @@ export async function getLiveByUids(uids: number[]): Promise<StarRow[]> {
   return (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [] }));
 }
 
-/** Active onboarded streamers keyed by Bilibili uid, for the 已入驻 badge. */
-export async function getClaimed(): Promise<ClaimedMap> {
-  "use cache";
-  cacheTag("streamers");
-  cacheLife({ stale: 60, revalidate: 300, expire: 3600 });
-  const sb = createAnonClient();
-  const { data } = await sb.from("streamer").select("handle, bili_uid").not("bili_uid", "is", null).returns<{ handle: string; bili_uid: number }[]>();
-  return new Map((data ?? []).map((s) => [s.bili_uid, s.handle]));
-}
-
 export type WatchData = {
   uid: number;
   room_id: number;
@@ -164,11 +152,10 @@ export type WatchData = {
   fans: number | null;
   level: number | null;
   live: { title: string; cover: string; keyframe: string; area: string; started_at: string | null; seen_at: string } | null;
-  handle: string | null;
   now: number;
 };
 
-/** Everything the watch page needs for one room: streamer facts + live state (if live) + claimed handle. */
+/** Everything the watch page needs for one room: streamer facts + live state (if live). */
 export async function getWatch(roomId: number): Promise<WatchData | null> {
   const sb = createAnonClient();
   const { data: live } = await sb
@@ -199,24 +186,10 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
       .eq("room_id", roomId)
       .is("deleted_at", null)
       .maybeSingle<{ uid: number; uname: string; face: string; fans: number | null; level: number | null }>();
-    if (s) {
-      uid = s.uid;
-      base = s;
-    } else {
-      // Claimed streamer the collector has never seen live: build the page from her own profile.
-      const { data: c } = await sb
-        .from("streamer")
-        .select("bili_uid, display_name, avatar_url")
-        .eq("bili_room_id", roomId)
-        .eq("status", "active")
-        .not("bili_uid", "is", null)
-        .maybeSingle<{ bili_uid: number; display_name: string; avatar_url: string }>();
-      if (!c) return null;
-      uid = c.bili_uid;
-      base = { uname: c.display_name, face: c.avatar_url, fans: null, level: null };
-    }
+    if (!s) return null;
+    uid = s.uid;
+    base = s;
   }
-  const claimed = await getClaimed();
   const fresh = live && Date.parse(live.seen_at) > Date.now() - STARS_STALE_MIN * 60 * 1000;
   return {
     uid,
@@ -228,7 +201,6 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
     live: fresh
       ? { title: live.title, cover: live.cover, keyframe: live.keyframe ?? "", area: live.area, started_at: live.started_at, seen_at: live.seen_at }
       : null,
-    handle: claimed.get(uid) ?? null,
     now: Date.now(),
   };
 }
@@ -249,7 +221,6 @@ export type CheckResult =
       last_seen_at: string;
       deleted: boolean;
       live: { title: string; area: string; started_at: string | null } | null;
-      handle: string | null;
       now: number;
     }
   | { kind: "unknown"; uid: number; room_id: number | null; uname: string; area: string; live_status: number }
@@ -296,15 +267,12 @@ export async function getCheck(raw: string): Promise<CheckResult> {
     row = data ?? null;
   }
   if (row) {
-    const [{ data: live }, { data: claimed }] = await Promise.all([
-      sb
-        .from("live_now")
-        .select("title, area, started_at, seen_at")
-        .eq("uid", row.uid)
-        .gt("seen_at", new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString())
-        .maybeSingle<{ title: string; area: string; started_at: string | null; seen_at: string }>(),
-      sb.from("streamer").select("handle").eq("bili_uid", row.uid).eq("status", "active").maybeSingle<{ handle: string }>(),
-    ]);
+    const { data: live } = await sb
+      .from("live_now")
+      .select("title, area, started_at, seen_at")
+      .eq("uid", row.uid)
+      .gt("seen_at", new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString())
+      .maybeSingle<{ title: string; area: string; started_at: string | null; seen_at: string }>();
     return {
       kind: "known",
       uid: row.uid,
@@ -317,7 +285,6 @@ export async function getCheck(raw: string): Promise<CheckResult> {
       last_seen_at: row.last_seen_at,
       deleted: row.deleted_at !== null,
       live: live ? { title: live.title, area: live.area, started_at: live.started_at } : null,
-      handle: claimed?.handle ?? null,
       now: Date.now(),
     };
   }

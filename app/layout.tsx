@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_SC } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { TzProvider } from "@/components/tz-provider";
 import "./globals.css";
 
 // Downloaded at build time and served from our own domain (/_next/static/media),
@@ -20,7 +19,7 @@ export const metadata: Metadata = {
     default: "天球 Tenkyu",
     template: "%s · 天球 Tenkyu",
   },
-  description: "小体量 VTuber 的本周直播时间表",
+  description: "现在在播的小体量 VTuber",
   metadataBase: new URL("https://tenkyu.app"),
   openGraph: { siteName: "天球 Tenkyu", type: "website", locale: "zh_CN" },
 };
@@ -36,7 +35,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN" className={`${notoSC.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-bg text-fg">
-        <TzProvider>{children}</TzProvider>
+        {children}
         <Analytics />
       </body>
     </html>

@@ -1,13 +1,11 @@
-// 观星台 collector. Runs every ~10 min on GitHub Actions (see .github/workflows/collector.yml).
+// Observatory collector. Runs every ~10 min on GitHub Actions (see .github/workflows/collector.yml).
 // No dependencies: Bilibili public endpoints in, Supabase PostgREST (service role) out.
 //
-// Env: SUPABASE_URL, SUPABASE_SECRET_KEY, optional REVALIDATE_URL + REVALIDATE_SECRET.
+// Env: SUPABASE_URL, SUPABASE_SECRET_KEY.
 // Exit code is 0 unless Supabase itself is unreachable — Bilibili hiccups are logged, not fatal.
 
 const SUPABASE_URL = need("SUPABASE_URL").replace(/\/$/, "");
 const KEY = need("SUPABASE_SECRET_KEY");
-const REVALIDATE_URL = process.env.REVALIDATE_URL ?? "";
-const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET ?? "";
 
 const UA = { "User-Agent": "Mozilla/5.0" };
 const SPACING_MS = 550;
@@ -155,12 +153,12 @@ async function fetchDetails(uids) {
 // 0.15 s from a home IP on 2026-09-22, while api.bilibili.com's `card` went -352 after ~330.
 //   get_anchor_in_room?roomid=  → info.platform_user_level (= account level; 433/433 agreed
 //                                 with card), uname, face. Works for offline rooms. A bad room
-//                                 id returns SOME account (room 1 = 哔哩哔哩直播) → verify info.uid.
+//                                 id returns SOME account (room 1 = Bilibili's own official room) → verify info.uid.
 //   Master/info?uid=            → follower_num (= relation/stat follower, verified), master_level,
 //                                 uname, face. Unknown uid → code 0 with uname "".
 // `card` stays as the fallback for rows without a room id (or when the anchor uid mismatches).
 function deletedFromCard(j) {
-  // -404 「啥都木有」 = no such user; a deleted account also shows as name 账号已注销.
+  // -404 = no such user; a deleted account also shows up with the literal name below.
   if (j.code === -404) return true;
   const name = j.data?.card?.name ?? "";
   return name === "账号已注销";
@@ -283,29 +281,6 @@ async function refreshLevels() {
   return { done, deleted };
 }
 
-// ---------------------------------------------------------------- 3. claimed cleanup
-async function hideDeletedClaimed() {
-  const gone = await rest(`bili_streamer?select=uid&deleted_at=not.is.null`);
-  if (!gone.length) return 0;
-  const list = gone.map((g) => g.uid).join(",");
-  const changed = await rest(`streamer?bili_uid=in.(${list})&status=neq.hidden`, {
-    method: "PATCH",
-    body: { status: "hidden" },
-    prefer: "return=representation",
-  });
-  const n = Array.isArray(changed) ? changed.length : 0;
-  if (n > 0 && REVALIDATE_URL && REVALIDATE_SECRET) {
-    for (const tag of ["streamers", ...changed.map((c) => `schedule:${c.handle}`)]) {
-      await fetch(`${REVALIDATE_URL}?tag=${encodeURIComponent(tag)}`, {
-        method: "POST",
-        headers: { "x-secret": REVALIDATE_SECRET },
-        signal: AbortSignal.timeout(15000),
-      }).catch(() => {});
-    }
-  }
-  return n;
-}
-
 // ---------------------------------------------------------------- main
 const t0 = Date.now();
 const s = await sweep();
@@ -341,12 +316,11 @@ if (s.ok && s.rooms.size > 0) {
 const b = await backfill();
 const f = await refreshFans();
 const l = await refreshLevels();
-const hidden = await hideDeletedClaimed();
 
 console.log(
   `sweep ${s.ok ? "ok" : "FAILED"}: ${s.rooms.size} live rooms in ${s.pages} pages; live_now +${upserted} -${removed}; details ${detailed}; ` +
     `backfill ${b.done} (deleted ${b.deleted}); fans refreshed ${f}; levels refreshed ${l.done} (deleted ${l.deleted}); ` +
-    `claimed hidden ${hidden}; risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
+    `risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
 );
 
 // A failed sweep (Bilibili error / risk control) is worth an email: GitHub notifies the

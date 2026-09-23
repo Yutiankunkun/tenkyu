@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /**
- * 「在线 N」 for a live room: logged-in viewers from Bilibili's 高能榜 count, refreshed every
+ * Online count for a live room: logged-in viewers from Bilibili's contribution-rank count, refreshed every
  * minute while the page is visible. Renders nothing until the first answer, and nothing at
  * all if the endpoint is unavailable — the page must never depend on it.
  */

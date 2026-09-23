@@ -45,7 +45,7 @@ export default function CheckPage({ searchParams }: { searchParams: SP }) {
         </p>
         <p className="text-muted">
           观星台的规则见
-          <Link href="/stars/about" className="underline">
+          <Link href="/about" className="underline">
             我们怎么选
           </Link>
           。
@@ -142,7 +142,6 @@ function ResultCard({ r, raw }: { r: CheckResult; raw: string }) {
           note={r.live ? undefined : "观星台只显示此刻在播的房间，下播后会在下一次更新时移除。"}
         />
         {r.deleted ? <Fact ok={false} text="B 站显示这个账号已注销或查询不到" note="观星台会自动移除，不再显示。" /> : null}
-        {r.handle ? <Fact ok={true} text="已入驻天球" note="她在天球维护自己的日程。" /> : null}
       </ul>
       <div className="mt-5 flex flex-wrap gap-2 text-sm">
         {r.live && r.room_id ? (
@@ -150,15 +149,6 @@ function ResultCard({ r, raw }: { r: CheckResult; raw: string }) {
             去观看页
           </Link>
         ) : null}
-        {r.handle ? (
-          <Link href={`/${r.handle}`} className="rounded-md border border-line px-3 py-2 hover:bg-fg/5">
-            看本周安排
-          </Link>
-        ) : (
-          <Link href="/studio/apply" className="rounded-md border border-line px-3 py-2 hover:bg-fg/5">
-            申请入驻
-          </Link>
-        )}
         <a href={removalHref} target="_blank" rel="noopener noreferrer" className="rounded-md border border-line px-3 py-2 hover:bg-fg/5">
           下架 / 纠错
         </a>

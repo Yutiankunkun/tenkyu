@@ -1,4 +1,4 @@
--- Tenkyu v2 — live session history (for 观测日程 / stability signals later).
+-- Tenkyu v2 — live session history (for inferred schedules / observed-weeks signals later).
 -- Apply in Supabase → SQL Editor after 0002_stars.sql.
 --
 -- live_session  one row per finished live session, closed when a live_now row
@@ -24,7 +24,7 @@ drop policy if exists "public read live_session" on public.live_session;
 create policy "public read live_session" on public.live_session for select using (true);
 grant select on public.live_session to anon, authenticated;
 
--- live_now upsert now also tracks the session's peak 人气.
+-- live_now upsert now also tracks the session's peak popularity score.
 create or replace function public.upsert_live_now(rows jsonb)
 returns integer
 language sql

@@ -1,118 +1,114 @@
-# 天球 Tenkyu
+# Tenkyu
 
-**When does she stream this week?**
+**A live observatory for small VTubers on Bilibili.**
 
-Tenkyu is a small, free web tool for small Chinese-speaking VTubers on
-Bilibili — 个人势, newcomers, streamers with a handful of viewers — and for
-the fans and operators who follow several of them at once.
+Tenkyu lists every room in Bilibili's VTuber area that is streaming right
+now, and is built for finding the *small* ones: a handful of viewers, a few
+hundred followers, no agency budget. It is free, has no accounts, and is run
+by one person.
 
-Live at **https://tenkyu.app** (Simplified Chinese UI).
+Live at **https://tenkyu.app** (Simplified Chinese UI; more languages planned).
 
 ## What it does
 
-- **Weekly schedule, maintained by the streamer.** A streamer logs in
-  (magic link, vetted invite only), sets a weekly template plus this week's
-  exceptions, and gets a public week page at `tenkyu.app/<handle>`.
-- **Merged view.** `tenkyu.app/w?s=a,b,c` shows several streamers side by
-  side. Picks live in the browser and in the URL — no fan accounts.
-- **周报图 export.** One click renders the week as a PNG, replacing the
-  hand-made schedule image most small streamers post every week.
-- **观星台 (the observatory).** A live board of every Bilibili VTuber-area
-  room currently streaming, built for finding *small* streams: a level gate
-  keeps throwaway accounts out, and the board is sorted for discovery, not
-  popularity. Each room has a watch page that embeds Bilibili's official
-  player; favourites stay in your browser.
+- **The board.** Every live VTuber-area room, refreshed every ten minutes,
+  gated by account level so throwaway accounts stay out. Filters by follower
+  band and topic, search by name, title or tag.
+- **Watch page.** Bilibili's official embedded player, the stream title,
+  time live, topic, and the room's logged-in viewer count refreshed every
+  minute.
+- **Favourites.** Kept in your browser only. A favourites-only view shows
+  which of them are live, and lists the rest as offline.
+- **Check page.** Paste a room id, UID or Bilibili URL and see whether the
+  room is listed and why: observed or not, account level against the gate,
+  live or not. Removal and correction requests start there.
 
 ## Principles
 
-- **One dataset, three readers.** The streamer is the only writer. Fans and
-  operators read the same public data; "groups" are just links.
-- **No fan accounts, no custody of other people's data.** The only account
-  type is a streamer editing her own public schedule.
-- **Bilibili data is enhancement, never dependency.** The schedule works with
-  every Bilibili endpoint down. Live data is collected from public endpoints
-  only, at a polite pace, and is never scraped from HTML.
-- **Honest numbers.** 人气值 (Bilibili's "popularity") is never shown. The
-  board's discovery axis is the room's logged-in viewer count; its trust axis
-  is account level plus how many weeks we have observed the room streaming.
-  Intensity (hours, streams per week) is never rewarded — it is the one
-  metric throwaway accounts maximise.
+- **No accounts, no custody of anyone's data.** Favourites live in
+  `localStorage`; nothing is uploaded.
+- **Public endpoints only, politely.** One sweep every ten minutes, batch
+  endpoints where they exist, no HTML scraping, no logged-in cookies.
+- **Honest numbers.** Bilibili's popularity score is never shown. The
+  discovery axis is the room's logged-in viewer count; the trust axis is
+  account level plus how many weeks the room has been observed streaming.
+  Intensity (hours, streams per week) is never rewarded.
 - **No negative labels, no reports, no blacklists, no donation UI.**
-- **Free, non-commercial, run by one person.** Expect small scope and slow
-  iteration.
+- **Free and non-commercial.** Small scope, slow iteration.
 
 ## Architecture
 
 ```
-streamer ──login──▶ Next.js (Vercel, hnd1) ──▶ Supabase Postgres
-                     │  server actions            │  streamer / slot_template / week_override
-                     │  cached JSON publish        │  bili_streamer / live_now / live_session
-fans / operators ◀───┘  static-ish pages           ▲
-                                                   │ PostgREST (service role)
 GitHub Actions (every ~10 min) ──▶ collector/sweep.mjs ──▶ Bilibili public live API
+                                         │
+                                         ▼ PostgREST (service role)
+                              Supabase Postgres (bili_streamer, live_now, live_session)
+                                         │
+                                         ▼ anon reads, one RPC per board page
+viewers ◀──────────────────── Next.js on Vercel (hnd1)
 ```
 
 - **Web app**: Next.js 16 (App Router, Cache Components), React 19,
-  Tailwind v4. Public pages are cached and tagged; a streamer's save
-  revalidates only her tag. The observatory's board query is one Postgres
-  function (`stars_page`) that gates, filters, sorts and paginates in the
-  database.
-- **Database / auth**: Supabase (Postgres + magic-link auth). Row-level
-  security: public read, streamer writes her own rows, the collector writes
-  with the service role.
-- **Collector**: a dependency-free Node script on GitHub Actions. Each run
-  sweeps the VTuber area room list, fetches per-room details in batches,
-  backfills account level / fans for newly seen streamers, archives finished
+  Tailwind v4. The board query is one Postgres function (`stars_page`) that
+  gates, filters, sorts and paginates in the database and returns a page of
+  JSON. Pages are cached and revalidated on a timer; nothing is written from
+  the web app.
+- **Database**: Supabase Postgres with row-level security — public read,
+  writes only by the collector's service role.
+- **Collector**: a dependency-free Node script. Each run sweeps the VTuber
+  area room list, fetches per-room details in batches, backfills account
+  level and follower counts for newly seen streamers, archives finished
   sessions, and dispatches the next run (GitHub's `schedule` trigger proved
-  unreliable, so the workflow chains itself). Risk control from Bilibili
-  fails the run so the owner gets an email.
+  unreliable, so the workflow chains itself). A Bilibili risk-control
+  response fails the run so the owner gets an email.
 
 ## Repository layout
 
 ```
-app/            routes (App Router)
-  [handle]/     public week page          w/          merged view
-  edit/         streamer editor           admin/      onboarding admin (email allowlist)
-  stars/        观星台 board + about       watch/      per-room watch page
-  api/          img proxy (hdslb only), live, streamers, revalidate
-  data/         per-streamer JSON
-components/     UI (week view, merged view, board grid, schedule image, ...)
-lib/            schedule maths, time zones, Bilibili client, Supabase clients
-collector/      sweep.mjs (the collector), probe.mjs (endpoint reachability check)
-supabase/       migrations/0001…0006 (apply in order), seed.example.sql
-.github/        collector.yml (self-chaining loop), bili-probe.yml
+app/(public)/     board (/), about, check, watch/[room], privacy
+app/api/          img proxy (hdslb only), live, online, streamers
+components/       board grid, watch-page pieces, header and footer
+lib/              board model, Bilibili client, Supabase anon client
+collector/        sweep.mjs (the collector), probe.mjs (endpoint reachability)
+supabase/         migrations 0001…0007 (apply in order); 0001 is legacy
+.github/          collector.yml (self-chaining loop), bili-probe.yml, issue templates
 ```
+
+Migration `0001_init.sql` created the tables of a retired feature (a
+streamer-maintained weekly schedule). They are unused and harmless; drop
+them or leave them.
 
 ## Running it yourself
 
 ```bash
 pnpm install
-cp .env.example .env.local   # fill in the Supabase values
+cp .env.example .env.local   # Supabase URL + publishable key
 pnpm dev                      # http://localhost:3000
 pnpm typecheck && pnpm lint && pnpm build
 ```
 
-1. Create a Supabase project and run `supabase/migrations/*.sql` in order in
-   the SQL editor. `seed.example.sql` shows how to invite a first streamer.
-2. Set the env vars from `.env.example`. `ADMIN_EMAILS` gates `/admin`;
-   `REVALIDATE_SECRET` is shared with the collector.
-3. For the collector, add repository secrets `SUPABASE_URL`,
-   `SUPABASE_SECRET_KEY`, `REVALIDATE_SECRET` and dispatch `collector.yml`
-   once; it keeps itself running. `bili-probe.yml` checks that the runner
-   can reach the Bilibili endpoints.
+1. Create a Supabase project and run `supabase/migrations/*.sql` in order.
+2. Add repository secrets `SUPABASE_URL` and `SUPABASE_SECRET_KEY`, then
+   dispatch `collector.yml` once; it keeps itself running. `bili-probe.yml`
+   checks that the runner can reach the Bilibili endpoints.
 
 The app is deployed on Vercel; the Supabase project and the Vercel functions
 sit in Tokyo.
 
 ## Status
 
-Early and personal. v1 (schedules, merged view, image export) and the first
-version of the observatory are live. Ranking inside the board, observed-weeks
-badges and a visual redesign are in progress. Issues and ideas are welcome;
-the product deliberately stays small.
+Early and personal. The board, watch page, favourites and check page are
+live. Ranking by viewer count, observed-weeks badges, a visual redesign and
+UI language switching are in progress. Issues and ideas are welcome; the
+product deliberately stays small.
+
+## Name
+
+Tenkyu (天球, "celestial sphere") follows the studio's naming convention: a
+generic word borrowed from a song title. No artist name, likeness, lyrics
+or artwork is used anywhere.
 
 ## License
 
 Not yet licensed. The source is public for transparency; all rights are
-reserved until a license is chosen. Open an issue if you want to reuse
-something.
+reserved until a license is chosen.

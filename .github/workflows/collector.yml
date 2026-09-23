@@ -33,8 +33,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          REVALIDATE_URL: https://tenkyu.app/api/revalidate
-          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
       - name: chain next run
         if: always()
         env:

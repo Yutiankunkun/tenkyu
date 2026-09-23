@@ -1,73 +1,135 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { Avatar } from "@/components/avatar";
-import { PickButton } from "@/components/pick-button";
-import { StarsPreview } from "@/components/stars-preview";
-import { getActiveStreamers } from "@/lib/schedule";
+import { StarsGrid } from "@/components/stars-grid";
+import { BAND_LIMIT, LEVEL_GATE, SORT_LABEL, TOPICS, getStars, type Band, type Sort, type Topic } from "@/lib/stars";
 
-export default function Home() {
+export const metadata = {
+  title: "观星台",
+  description: "现在在播的小体量 VTuber。只收账号等级 3 级以上的主播。",
+};
+
+type SP = Promise<{ band?: string; topic?: string; q?: string; sort?: string; p?: string }>;
+
+export default function StarsPage({ searchParams }: { searchParams: SP }) {
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-12">
-      <div className="max-w-2xl space-y-4">
-        <h1 className="text-3xl font-semibold tracking-tight">这周谁几点播</h1>
-        <p className="text-lg leading-8 text-muted">
-          小体量 VTuber 的直播时间表。主播自己维护，粉丝和运营一页看全，不用一个个翻主页。
-        </p>
-        <div className="flex flex-wrap gap-3 pt-1">
-          <Link href="/w" className="rounded-md bg-fg px-4 py-2 text-sm font-medium text-bg hover:opacity-90">
-            打开合并日程
-          </Link>
-          <Link href="/studio/apply" className="rounded-md border border-line px-4 py-2 text-sm hover:bg-fg/5">
-            我是主播，申请入驻
-          </Link>
+    <main className="mx-auto w-full max-w-5xl px-4 py-8">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">观星台</h1>
+          <p className="mt-1 text-sm text-muted">
+            现在在播的小体量 VTuber。只收账号等级 {LEVEL_GATE} 级以上的主播，约每 10 分钟更新。
+            <Link href="/about" className="ml-2 underline">
+              我们怎么选
+            </Link>
+            <Link href="/check" className="ml-2 underline">
+              查一查我在不在
+            </Link>
+          </p>
         </div>
-      </div>
-
-      <div className="mt-12">
-        <Suspense fallback={null}>
-          <LiveTeaser />
-        </Suspense>
-      </div>
-
-      <section className="mt-12 space-y-3">
-        <h2 className="text-lg font-semibold">入驻主播</h2>
+      </header>
+      <div className="mt-6">
         <Suspense fallback={<p className="text-muted">加载中…</p>}>
-          <StreamerList />
+          <Board searchParams={searchParams} />
         </Suspense>
-      </section>
+      </div>
     </main>
   );
 }
 
-async function LiveTeaser() {
-  await connection();
-  return <StarsPreview limit={6} />;
-}
+const parseBand = (v: string | undefined): Band => (v === "new" || v === "all" ? v : "small");
+const parseSort = (v: string | undefined): Sort => (v === "small" ? v : "new");
+const parseTopic = (v: string | undefined): Topic | null => (TOPICS as readonly string[]).includes(v ?? "") ? (v as Topic) : null;
+const clean = (v: string | undefined, max: number) => (v ? v.trim().slice(0, max) : "") || null;
 
-async function StreamerList() {
-  await connection(); // render at request time; the list itself is cached (tag: streamers)
-  let list: Awaited<ReturnType<typeof getActiveStreamers>>;
+async function Board({ searchParams }: { searchParams: SP }) {
+  await connection();
+  const sp = await searchParams;
+  const query = { band: parseBand(sp.band), topic: parseTopic(sp.topic), q: clean(sp.q, 40), sort: parseSort(sp.sort), page: Number(sp.p ?? 1) || 1 };
+
+  let data: Awaited<ReturnType<typeof getStars>>;
   try {
-    list = await getActiveStreamers();
+    data = await getStars(query);
   } catch {
-    return <p className="text-muted">主播列表暂时无法加载。</p>;
+    return <p className="text-muted">观星台暂时无法加载。</p>;
   }
-  if (list.length === 0) return <p className="text-muted">还没有主播上线。</p>;
+
+  const href = (next: Partial<typeof query>) => {
+    const n = { ...query, page: 1, ...next };
+    const p = new URLSearchParams();
+    if (n.band !== "small") p.set("band", n.band);
+    if (n.topic) p.set("topic", n.topic);
+    if (n.q) p.set("q", n.q);
+    if (n.sort !== "new") p.set("sort", n.sort);
+    if (n.page > 1) p.set("p", String(n.page));
+    const s = p.toString();
+    return s ? `/?${s}` : "/";
+  };
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1 text-sm ${on ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`;
+
   return (
-    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((s) => (
-        <li key={s.handle} className="flex items-center gap-3 rounded-xl border border-line bg-bg p-3 transition-colors hover:bg-fg/5">
-          <Link href={`/${s.handle}`} className="flex min-w-0 flex-1 items-center gap-3">
-            <Avatar src={s.avatar_url} name={s.display_name} color={s.theme_color} size={44} />
-            <div className="min-w-0">
-              <div className="truncate font-medium">{s.display_name}</div>
-              {s.intro ? <div className="truncate text-sm text-muted">{s.intro}</div> : null}
-            </div>
+    <div className="space-y-4">
+      <form action="/" method="get" className="flex gap-2">
+        {query.band !== "small" ? <input type="hidden" name="band" value={query.band} /> : null}
+        {query.sort !== "new" ? <input type="hidden" name="sort" value={query.sort} /> : null}
+        <input
+          name="q"
+          defaultValue={query.q ?? ""}
+          placeholder="搜主播或标题"
+          maxLength={40}
+          className="w-full max-w-md rounded-md border border-line bg-bg px-3 py-2 text-sm"
+        />
+        <button className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">搜索</button>
+        {query.q || query.topic ? (
+          <Link href={href({ q: null, topic: null })} className="self-center text-sm text-muted hover:text-fg">
+            清除
           </Link>
-          <PickButton handle={s.handle} />
-        </li>
-      ))}
-    </ul>
+        ) : null}
+      </form>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {(
+          [
+            ["new", `新人 < ${BAND_LIMIT.new}`],
+            ["small", "小体量 < 1 万"],
+            ["all", "全部"],
+          ] as [Band, string][]
+        ).map(([b, label]) => (
+          <Link key={b} href={href({ band: b })} className={chip(query.band === b)}>
+            {label}
+          </Link>
+        ))}
+        <span className="mx-1 text-line">|</span>
+        {(Object.keys(SORT_LABEL) as Sort[]).map((s) => (
+          <Link key={s} href={href({ sort: s })} className={chip(query.sort === s)}>
+            {SORT_LABEL[s]}
+          </Link>
+        ))}
+      </div>
+
+      {data.topics.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={href({ topic: null })} className={chip(query.topic === null)}>
+            全部
+          </Link>
+          {data.topics.map(({ topic, n }) => (
+            <Link key={topic} href={href({ topic })} className={chip(query.topic === topic)}>
+              {topic} <span className="opacity-60">{n}</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      <StarsGrid
+        rows={data.rows}
+        total={data.total}
+        page={data.page}
+        pages={data.pages}
+        pageBase={href({ page: 1 })}
+        now={data.now}
+        updatedAt={data.updatedAt}
+      />
+    </div>
   );
 }

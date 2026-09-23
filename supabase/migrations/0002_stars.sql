@@ -1,4 +1,4 @@
--- Tenkyu v2 — 观星台: Bilibili live VTuber snapshot collected by collector/sweep.mjs.
+-- Tenkyu v2 — the observatory: Bilibili live VTuber snapshot collected by collector/sweep.mjs.
 -- Apply in Supabase → SQL Editor after 0001_init.sql.
 --
 -- bili_streamer  every Bilibili VTuber we have ever seen live (public facts only)

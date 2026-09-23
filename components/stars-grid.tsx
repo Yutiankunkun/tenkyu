@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { FAVS_KEY, FavButton, parseFavs } from "@/components/fav-button";
 import { useLocalString } from "@/lib/local-store";
@@ -13,17 +13,15 @@ type Props = {
   page: number;
   pages: number;
   pageBase: string; // list URL without the page param
-  claimed: [number, string][]; // uid → handle
   now: number;
   updatedAt: string | null;
 };
 
 type Offline = { uid: number; uname: string; face: string; room_id: number | null; fans: number | null; last_seen_at: string };
 
-/** 观星台 card grid. Client-side so ♡ and 「只看收藏」 work without an account. */
-export function StarsGrid({ rows, total, page, pages, pageBase, claimed, now, updatedAt }: Props) {
+/** Observatory card grid. Client-side so favourites and the favourites-only filter work without an account. */
+export function StarsGrid({ rows, total, page, pages, pageBase, now, updatedAt }: Props) {
   const pageHref = (p: number) => (p <= 1 ? pageBase : `${pageBase}${pageBase.includes("?") ? "&" : "?"}p=${p}`);
-  const claimedMap = useMemo(() => new Map(claimed), [claimed]);
   const favs = parseFavs(useLocalString(FAVS_KEY));
   const [favsOnly, setFavsOnly] = useState(false);
   const [favLive, setFavLive] = useState<StarRow[] | null>(null);
@@ -84,7 +82,6 @@ export function StarsGrid({ rows, total, page, pages, pageBase, claimed, now, up
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((r) => {
-            const handle = claimedMap.get(r.uid);
             const mins = minutesLive(r.started_at, now);
             return (
               <li key={r.uid} className="overflow-hidden rounded-xl border border-line bg-bg">
@@ -103,11 +100,6 @@ export function StarsGrid({ rows, total, page, pages, pageBase, claimed, now, up
                       <Link href={`/watch/${r.room_id}`} className="truncate font-medium hover:underline">
                         {r.bili_streamer.uname}
                       </Link>
-                      {handle ? (
-                        <Link href={`/${handle}`} className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-xs text-accent">
-                          已入驻
-                        </Link>
-                      ) : null}
                     </div>
                     <div className="truncate text-sm text-fg/80">{r.title}</div>
                     <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted">
@@ -127,11 +119,6 @@ export function StarsGrid({ rows, total, page, pages, pageBase, claimed, now, up
                       去直播间 →
                     </a>
                   </span>
-                  {handle ? (
-                    <Link href={`/${handle}`} className="text-muted hover:text-fg">
-                      看她的日程
-                    </Link>
-                  ) : null}
                 </div>
               </li>
             );

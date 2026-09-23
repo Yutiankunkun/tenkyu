@@ -11,13 +11,13 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-0.5 sm:gap-1">
           <Link href="/" className={item}>
-            主播
-          </Link>
-          <Link href="/w" className={item}>
-            合并日程
-          </Link>
-          <Link href="/stars" className={item}>
             观星台
+          </Link>
+          <Link href="/check" className={item}>
+            查一查
+          </Link>
+          <Link href="/about" className={item}>
+            说明
           </Link>
         </nav>
       </div>

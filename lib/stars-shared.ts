@@ -1,4 +1,4 @@
-// Client-safe part of the 观星台 model: types, constants and pure helpers.
+// Client-safe part of the observatory model: types, constants and pure helpers.
 // Server-only reads (cached Supabase queries) live in lib/stars.ts.
 
 export const STARS_STALE_MIN = 20;
@@ -9,7 +9,7 @@ export type Sort = "new" | "small";
 export const SORT_LABEL: Record<Sort, string> = { new: "刚开播", small: "粉丝少" };
 export const PAGE_SIZE = 60;
 
-/** Bilibili 分区 → a small topic set (Holodex-style), the only category filter we show. */
+/** Bilibili live area → a small topic set (Holodex-style), the only category filter we show. */
 export const TOPICS = ["杂谈", "歌", "游戏", "电台", "其他"] as const;
 export type Topic = (typeof TOPICS)[number];
 export function topicOf(area: string): Topic {

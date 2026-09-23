@@ -1,4 +1,4 @@
--- 观星台 board query as ONE database call: gate, band, topic, search, sort and
+-- Observatory board query as ONE database call: gate, band, topic, search, sort and
 -- pagination happen in Postgres; the web app receives one page of JSON.
 -- Apply in Supabase → SQL Editor after 0005_indexes.sql.
 

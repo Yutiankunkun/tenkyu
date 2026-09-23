@@ -4,14 +4,15 @@ const nextConfig: NextConfig = {
   // Cache Components: public reads are cached with `use cache` + cacheTag and
   // invalidated from server actions with updateTag (see lib/schedule.ts).
   cacheComponents: true,
-  // 2026-09-23: the streamer side moved under /studio. Old links (magic-link emails,
-  // bookmarks, the 周报图 footer) keep working.
+  // Retired paths (schedule editor, onboarding, merged view) and the old /stars prefix.
   async redirects() {
-    return ["login", "edit", "admin", "apply"].map((p) => ({
-      source: `/${p}`,
-      destination: `/studio/${p}`,
-      permanent: true,
-    }));
+    const gone = ["login", "edit", "admin", "apply", "w", "studio", "studio/:path*", "data/:path*"];
+    return [
+      { source: "/stars", destination: "/", permanent: true },
+      { source: "/stars/about", destination: "/about", permanent: true },
+      { source: "/stars/check", destination: "/check", permanent: true },
+      ...gone.map((p) => ({ source: "/" + p, destination: "/", permanent: true })),
+    ];
   },
 };
 
