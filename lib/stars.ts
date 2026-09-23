@@ -11,9 +11,9 @@ import {
   LEVEL_GATE,
   PAGE_SIZE,
   STARS_STALE_MIN,
-  TOPICS,
-  topicOf,
   type Band,
+  type OnlineBand,
+  type OnlineCounts,
   type Sort,
   type StarRow,
   type Topic,
@@ -21,30 +21,7 @@ import {
 
 export * from "@/lib/stars-shared";
 
-/** Cached raw fetch of every gated live row in a band (no keyframe: cards use covers). */
-export async function fetchBandRows(band: Band): Promise<StarRow[]> {
-  "use cache";
-  cacheTag("stars");
-  cacheLife({ stale: 60, revalidate: 60, expire: 600 });
-
-  const sb = createAnonClient();
-  const since = new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString();
-  let q = sb
-    .from("live_now")
-    .select("uid, room_id, title, cover, tags, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level)")
-    .gte("seen_at", since)
-    .gte("bili_streamer.level", LEVEL_GATE)
-    .is("bili_streamer.deleted_at", null)
-    .order("started_at", { ascending: false, nullsFirst: false })
-    .limit(3000);
-  const limit = BAND_LIMIT[band];
-  if (limit !== null) q = q.lt("bili_streamer.fans", limit);
-  const { data, error } = await q.returns<StarRow[]>();
-  if (error) throw error;
-  return (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [] }));
-}
-
-export type StarsQuery = { band: Band; topic: Topic | null; q: string | null; sort: Sort; page: number; size?: number };
+export type StarsQuery = { band: Band; online: OnlineBand | null; topic: Topic | null; q: string | null; sort: Sort; page: number; size?: number };
 
 export type StarsResult = {
   rows: StarRow[]; // current page only
@@ -52,17 +29,17 @@ export type StarsResult = {
   page: number;
   pages: number;
   topics: { topic: Topic; n: number }[];
+  onlineCounts: OnlineCounts | null;
   updatedAt: string | null;
   now: number;
 };
 
-const norm = (s: string) => s.toLowerCase();
 const escapeLike = (s: string) => s.replace(/[\%_]/g, (c) => "\\" + c);
 
-type StarsPageRpc = { total: number; topics: { topic: Topic; n: number }[]; updated_at: string | null; rows: StarRow[] };
+type StarsPageRpc = { total: number; topics: { topic: Topic; n: number }[]; online: OnlineCounts | null; updated_at: string | null; rows: StarRow[] };
 
-/** One database call (migration 0006). Cached briefly per distinct query. */
-async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResult | null> {
+/** One database call (migrations 0006–0009). Cached briefly per distinct query. */
+async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResult> {
   "use cache";
   cacheTag("stars");
   cacheLife({ stale: 30, revalidate: 60, expire: 300 });
@@ -77,54 +54,26 @@ async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResul
     p_size: size,
     p_stale_minutes: STARS_STALE_MIN,
     p_level_gate: LEVEL_GATE,
+    p_online: query.online,
+    p_seed: Math.floor(Date.now() / 600000), // one seed per ~10-minute sweep: the shuffle is stable for that long
   });
-  if (error) {
-    if (error.code === "PGRST202" || /stars_page/.test(error.message)) return null; // migration not applied yet
-    throw error;
-  }
+  if (error) throw error;
   const r = data as StarsPageRpc;
   const pages = Math.max(1, Math.ceil(r.total / size));
   return {
-    rows: (r.rows ?? []).map((x) => ({ ...x, tags: x.tags ?? [] })),
+    rows: (r.rows ?? []).map((x) => ({ ...x, tags: x.tags ?? [], weeks_observed: x.weeks_observed ?? 0 })),
     total: r.total,
     page: Math.min(Math.max(1, query.page), pages),
     pages,
     topics: r.topics ?? [],
+    onlineCounts: r.online ?? null,
     updatedAt: r.updated_at,
     now: Date.now(),
   };
 }
 
-/** In-memory fallback over the cached band fetch (used until 0006 is applied). */
-async function starsPageInMemory(query: StarsQuery, size: number): Promise<StarsResult> {
-  const all = await fetchBandRows(query.band);
-  const topicCount = new Map<Topic, number>();
-  for (const r of all) {
-    const t = topicOf(r.area);
-    topicCount.set(t, (topicCount.get(t) ?? 0) + 1);
-  }
-  const topics = TOPICS.filter((t) => topicCount.has(t)).map((t) => ({ topic: t, n: topicCount.get(t)! }));
-  let rows = all;
-  if (query.topic) rows = rows.filter((r) => topicOf(r.area) === query.topic);
-  if (query.q) {
-    const needle = norm(query.q);
-    rows = rows.filter(
-      (r) => norm(r.bili_streamer.uname).includes(needle) || norm(r.title).includes(needle) || r.tags.some((t) => norm(t).includes(needle)),
-    );
-  }
-  const byStart = (a: StarRow, b: StarRow) => (b.started_at ?? "").localeCompare(a.started_at ?? "");
-  if (query.sort === "small") rows = [...rows].sort((a, b) => (a.bili_streamer.fans ?? 1e9) - (b.bili_streamer.fans ?? 1e9) || byStart(a, b));
-  else rows = [...rows].sort(byStart);
-  const total = rows.length;
-  const pages = Math.max(1, Math.ceil(total / size));
-  const page = Math.min(Math.max(1, query.page), pages);
-  const updatedAt = all.length ? all.map((r) => r.seen_at).sort().at(-1)! : null;
-  return { rows: rows.slice((page - 1) * size, page * size), total, page, pages, topics, updatedAt, now: Date.now() };
-}
-
 export async function getStars(query: StarsQuery): Promise<StarsResult> {
-  const size = query.size ?? PAGE_SIZE;
-  return (await starsPageRpc(query, size)) ?? starsPageInMemory(query, size);
+  return starsPageRpc(query, query.size ?? PAGE_SIZE);
 }
 
 /** Live rows for specific uids (favourites view), gate applied. */
@@ -134,14 +83,14 @@ export async function getLiveByUids(uids: number[]): Promise<StarRow[]> {
   const since = new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString();
   const { data, error } = await sb
     .from("live_now")
-    .select("uid, room_id, title, cover, tags, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level)")
+    .select("uid, room_id, title, cover, tags, area, started_at, seen_at, online_count, online_fetched_at, bili_streamer!inner(uname, face, fans, level, weeks_observed)")
     .in("uid", uids)
     .gte("seen_at", since)
     .gte("bili_streamer.level", LEVEL_GATE)
     .is("bili_streamer.deleted_at", null)
-    .returns<StarRow[]>();
+    .returns<(Omit<StarRow, "weeks_observed"> & { bili_streamer: StarRow["bili_streamer"] & { weeks_observed: number | null } })[]>();
   if (error) throw error;
-  return (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [] }));
+  return (data ?? []).map((r) => ({ ...r, tags: r.tags ?? [], weeks_observed: r.bili_streamer.weeks_observed ?? 0 }));
 }
 
 export type WatchData = {
@@ -151,6 +100,7 @@ export type WatchData = {
   face: string;
   fans: number | null;
   level: number | null;
+  weeks_observed: number;
   live: { title: string; cover: string; keyframe: string; area: string; started_at: string | null; seen_at: string } | null;
   now: number;
 };
@@ -160,7 +110,7 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
   const sb = createAnonClient();
   const { data: live } = await sb
     .from("live_now")
-    .select("uid, room_id, title, cover, keyframe, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level, deleted_at)")
+    .select("uid, room_id, title, cover, keyframe, area, started_at, seen_at, bili_streamer!inner(uname, face, fans, level, weeks_observed, deleted_at)")
     .eq("room_id", roomId)
     .maybeSingle<{
       uid: number;
@@ -171,21 +121,21 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
       area: string;
       started_at: string | null;
       seen_at: string;
-      bili_streamer: { uname: string; face: string; fans: number | null; level: number | null; deleted_at: string | null };
+      bili_streamer: { uname: string; face: string; fans: number | null; level: number | null; weeks_observed: number | null; deleted_at: string | null };
     }>();
 
   let uid: number;
-  let base: { uname: string; face: string; fans: number | null; level: number | null };
+  let base: { uname: string; face: string; fans: number | null; level: number | null; weeks_observed: number | null };
   if (live && !live.bili_streamer.deleted_at) {
     uid = live.uid;
     base = live.bili_streamer;
   } else {
     const { data: s } = await sb
       .from("bili_streamer")
-      .select("uid, uname, face, fans, level, deleted_at")
+      .select("uid, uname, face, fans, level, weeks_observed, deleted_at")
       .eq("room_id", roomId)
       .is("deleted_at", null)
-      .maybeSingle<{ uid: number; uname: string; face: string; fans: number | null; level: number | null }>();
+      .maybeSingle<{ uid: number; uname: string; face: string; fans: number | null; level: number | null; weeks_observed: number | null }>();
     if (!s) return null;
     uid = s.uid;
     base = s;
@@ -198,6 +148,7 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
     face: base.face,
     fans: base.fans,
     level: base.level,
+    weeks_observed: base.weeks_observed ?? 0,
     live: fresh
       ? { title: live.title, cover: live.cover, keyframe: live.keyframe ?? "", area: live.area, started_at: live.started_at, seen_at: live.seen_at }
       : null,
@@ -217,6 +168,7 @@ export type CheckResult =
       face: string;
       level: number | null;
       fans: number | null;
+      weeks_observed: number;
       first_seen_at: string;
       last_seen_at: string;
       deleted: boolean;
@@ -245,6 +197,7 @@ type KnownRow = {
   face: string;
   level: number | null;
   fans: number | null;
+  weeks_observed: number | null;
   first_seen_at: string;
   last_seen_at: string;
   deleted_at: string | null;
@@ -256,7 +209,7 @@ export async function getCheck(raw: string): Promise<CheckResult> {
   if (!parsed) return { kind: "invalid" };
   const { n, hint } = parsed;
   const sb = createAnonClient();
-  const cols = "uid, room_id, uname, face, level, fans, first_seen_at, last_seen_at, deleted_at";
+  const cols = "uid, room_id, uname, face, level, fans, weeks_observed, first_seen_at, last_seen_at, deleted_at";
   let row: KnownRow | null = null;
   if (hint !== "uid") {
     const { data } = await sb.from("bili_streamer").select(cols).eq("room_id", n).limit(1).maybeSingle<KnownRow>();
@@ -281,6 +234,7 @@ export async function getCheck(raw: string): Promise<CheckResult> {
       face: row.face,
       level: row.level,
       fans: row.fans,
+      weeks_observed: row.weeks_observed ?? 0,
       first_seen_at: row.first_seen_at,
       last_seen_at: row.last_seen_at,
       deleted: row.deleted_at !== null,

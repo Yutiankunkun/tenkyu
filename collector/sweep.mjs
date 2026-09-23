@@ -281,6 +281,16 @@ async function refreshLevels() {
   return { done, deleted };
 }
 
+// ---------------------------------------------------------------- 3. observed weeks (migration 0009)
+async function refreshWeeks() {
+  try {
+    return (await rpc("refresh_observed_weeks", { window_weeks: 26 })) ?? 0;
+  } catch (e) {
+    console.log(`refresh_observed_weeks unavailable (${e instanceof Error ? e.message.slice(0, 80) : e}); apply migration 0009`);
+    return -1;
+  }
+}
+
 // ---------------------------------------------------------------- main
 const t0 = Date.now();
 const s = await sweep();
@@ -316,11 +326,12 @@ if (s.ok && s.rooms.size > 0) {
 const b = await backfill();
 const f = await refreshFans();
 const l = await refreshLevels();
+const w = await refreshWeeks();
 
 console.log(
   `sweep ${s.ok ? "ok" : "FAILED"}: ${s.rooms.size} live rooms in ${s.pages} pages; live_now +${upserted} -${removed}; details ${detailed}; ` +
     `backfill ${b.done} (deleted ${b.deleted}); fans refreshed ${f}; levels refreshed ${l.done} (deleted ${l.deleted}); ` +
-    `risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
+    `weeks refreshed ${w}; risk_control=${riskControl}; ${Math.round((Date.now() - t0) / 1000)}s`,
 );
 
 // A failed sweep (Bilibili error / risk control) is worth an email: GitHub notifies the

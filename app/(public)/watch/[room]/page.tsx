@@ -92,6 +92,7 @@ async function Watch({ params }: { params: Params }) {
             <div className="text-sm text-muted">
               {formatFans(w.fans)}
               {w.level !== null ? ` · 账号 ${w.level} 级` : ""}
+              {w.weeks_observed >= 1 ? ` · 观测 ${w.weeks_observed} 周` : ""}
             </div>
           </div>
           <div className="flex items-center gap-2">

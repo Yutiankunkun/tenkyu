@@ -1,0 +1,44 @@
+name: online
+
+# Logged-in viewer counts, one request per live room. Runs as its own self-chaining loop so
+# the 10-minute sweep never waits for it: each run works through the rooms with the oldest
+# data for up to 9 minutes, then dispatches the next run (at least 5 minutes after its own
+# start). The cron is a backup only; the concurrency group keeps one run in flight.
+on:
+  schedule:
+    - cron: "5,35 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: online
+  cancel-in-progress: false
+
+jobs:
+  online:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      INTERVAL_SECONDS: "300"
+    steps:
+      - run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node collector/online.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      - name: chain next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          elapsed=$(( $(date +%s) - JOB_START ))
+          wait=$(( INTERVAL_SECONDS - elapsed ))
+          if [ "$wait" -gt 0 ]; then echo "sleeping ${wait}s to keep a ${INTERVAL_SECONDS}s minimum cadence"; sleep "$wait"; fi
+          gh workflow run online.yml --ref main -R "$GITHUB_REPOSITORY"

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { FAVS_KEY, FavButton, parseFavs } from "@/components/fav-button";
 import { useLocalString } from "@/lib/local-store";
-import { formatFans, formatLive, minutesLive, topicOf, type StarRow } from "@/lib/stars-shared";
+import { formatFans, formatLive, formatOnline, minutesLive, topicOf, weeksLabel, type StarRow } from "@/lib/stars-shared";
 
 type Props = {
   rows: StarRow[]; // one page
@@ -103,9 +103,11 @@ export function StarsGrid({ rows, total, page, pages, pageBase, now, updatedAt }
                     </div>
                     <div className="truncate text-sm text-fg/80">{r.title}</div>
                     <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted">
+                      {r.online_count !== null ? <span className="text-fg/80">{formatOnline(r.online_count)}</span> : null}
                       <span>{topicOf(r.area)}</span>
                       <span>{formatFans(r.bili_streamer.fans)}</span>
                       {mins !== null ? <span>已播 {formatLive(mins)}</span> : null}
+                      {weeksLabel(r.weeks_observed) ? <span className="text-accent">{weeksLabel(r.weeks_observed)}</span> : null}
                     </div>
                   </div>
                   <FavButton uid={r.uid} name={r.bili_streamer.uname} size="sm" />

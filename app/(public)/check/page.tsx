@@ -141,6 +141,11 @@ function ResultCard({ r, raw }: { r: CheckResult; raw: string }) {
           text={r.live ? `现在正在直播${mins !== null ? `，已播 ${formatLive(mins)}` : ""}${r.live.area ? ` · ${topicOf(r.live.area)}` : ""}` : "现在没有在播"}
           note={r.live ? undefined : "观星台只显示此刻在播的房间，下播后会在下一次更新时移除。"}
         />
+        <Fact
+          ok={r.weeks_observed >= 1 ? true : null}
+          text={r.weeks_observed >= 1 ? `在天球观测到 ${r.weeks_observed} 周有开播` : "观测周数还是 0"}
+          note="最近 26 周里有几个星期至少播过一次。一个星期最多记一次，播得再多也不加分；观测久的在综合排序里靠前。"
+        />
         {r.deleted ? <Fact ok={false} text="B 站显示这个账号已注销或查询不到" note="观星台会自动移除，不再显示。" /> : null}
       </ul>
       <div className="mt-5 flex flex-wrap gap-2 text-sm">

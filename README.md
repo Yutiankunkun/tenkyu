@@ -55,12 +55,14 @@ viewers ◀──────────────────── Next.js 
   the web app.
 - **Database**: Supabase Postgres with row-level security — public read,
   writes only by the collector's service role.
-- **Collector**: a dependency-free Node script. Each run sweeps the VTuber
+- **Collectors**: two dependency-free Node scripts. The sweep runs every ten minutes: it sweeps the VTuber
   area room list, fetches per-room details in batches, backfills account
   level and follower counts for newly seen streamers, archives finished
-  sessions, and dispatches the next run (GitHub's `schedule` trigger proved
-  unreliable, so the workflow chains itself). A Bilibili risk-control
-  response fails the run so the owner gets an email.
+  sessions, refreshes observed weeks, and dispatches the next run (GitHub's
+  `schedule` trigger proved unreliable, so the workflow chains itself). The
+  online loop visits each gated live room for its logged-in viewer count,
+  oldest data first. A Bilibili risk-control response fails a run so the
+  owner gets an email.
 
 ## Repository layout
 
@@ -69,9 +71,9 @@ app/(public)/     board (/), about, check, watch/[room], privacy
 app/api/          img proxy (hdslb only), live, online, streamers
 components/       board grid, watch-page pieces, header and footer
 lib/              board model, Bilibili client, Supabase anon client
-collector/        sweep.mjs (the collector), probe.mjs (endpoint reachability)
-supabase/         migrations 0001…0007 (apply in order); 0001 is legacy
-.github/          collector.yml (self-chaining loop), bili-probe.yml, issue templates
+collector/        sweep.mjs (rooms, details, profiles), online.mjs (viewer counts), probe.mjs
+supabase/         migrations 0001…0010 (apply in order); 0001 is legacy, 0010 optional
+.github/          collector.yml + online.yml (self-chaining loops), bili-probe.yml, issue templates
 ```
 
 Migration `0001_init.sql` created the tables of a retired feature (a

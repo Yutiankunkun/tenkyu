@@ -2,14 +2,28 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { StarsGrid } from "@/components/stars-grid";
-import { BAND_LIMIT, LEVEL_GATE, SORT_LABEL, TOPICS, getStars, type Band, type Sort, type Topic } from "@/lib/stars";
+import {
+  BAND_LIMIT,
+  DEFAULT_SORT,
+  LEVEL_GATE,
+  ONLINE_BANDS,
+  ONLINE_COUNT_KEY,
+  ONLINE_LABEL,
+  SORT_LABEL,
+  TOPICS,
+  getStars,
+  type Band,
+  type OnlineBand,
+  type Sort,
+  type Topic,
+} from "@/lib/stars";
 
 export const metadata = {
   title: "观星台",
   description: "现在在播的小体量 VTuber。只收账号等级 3 级以上的主播。",
 };
 
-type SP = Promise<{ band?: string; topic?: string; q?: string; sort?: string; p?: string }>;
+type SP = Promise<{ band?: string; o?: string; topic?: string; q?: string; sort?: string; p?: string }>;
 
 export default function StarsPage({ searchParams }: { searchParams: SP }) {
   return (
@@ -37,15 +51,23 @@ export default function StarsPage({ searchParams }: { searchParams: SP }) {
   );
 }
 
-const parseBand = (v: string | undefined): Band => (v === "new" || v === "all" ? v : "small");
-const parseSort = (v: string | undefined): Sort => (v === "small" ? v : "new");
-const parseTopic = (v: string | undefined): Topic | null => (TOPICS as readonly string[]).includes(v ?? "") ? (v as Topic) : null;
+const parseBand = (v: string | undefined): Band => (v === "new" || v === "small" ? v : "all");
+const parseOnline = (v: string | undefined): OnlineBand | null => ((ONLINE_BANDS as readonly string[]).includes(v ?? "") ? (v as OnlineBand) : null);
+const parseSort = (v: string | undefined): Sort => (v === "online" || v === "small" || v === "new" ? v : DEFAULT_SORT);
+const parseTopic = (v: string | undefined): Topic | null => ((TOPICS as readonly string[]).includes(v ?? "") ? (v as Topic) : null);
 const clean = (v: string | undefined, max: number) => (v ? v.trim().slice(0, max) : "") || null;
 
 async function Board({ searchParams }: { searchParams: SP }) {
   await connection();
   const sp = await searchParams;
-  const query = { band: parseBand(sp.band), topic: parseTopic(sp.topic), q: clean(sp.q, 40), sort: parseSort(sp.sort), page: Number(sp.p ?? 1) || 1 };
+  const query = {
+    band: parseBand(sp.band),
+    online: parseOnline(sp.o),
+    topic: parseTopic(sp.topic),
+    q: clean(sp.q, 40),
+    sort: parseSort(sp.sort),
+    page: Number(sp.p ?? 1) || 1,
+  };
 
   let data: Awaited<ReturnType<typeof getStars>>;
   try {
@@ -57,22 +79,25 @@ async function Board({ searchParams }: { searchParams: SP }) {
   const href = (next: Partial<typeof query>) => {
     const n = { ...query, page: 1, ...next };
     const p = new URLSearchParams();
-    if (n.band !== "small") p.set("band", n.band);
+    if (n.online) p.set("o", n.online);
+    if (n.band !== "all") p.set("band", n.band);
     if (n.topic) p.set("topic", n.topic);
     if (n.q) p.set("q", n.q);
-    if (n.sort !== "new") p.set("sort", n.sort);
+    if (n.sort !== DEFAULT_SORT) p.set("sort", n.sort);
     if (n.page > 1) p.set("p", String(n.page));
     const s = p.toString();
     return s ? `/?${s}` : "/";
   };
   const chip = (on: boolean) =>
     `rounded-full border px-3 py-1 text-sm ${on ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`;
+  const oc = data.onlineCounts;
 
   return (
     <div className="space-y-4">
       <form action="/" method="get" className="flex gap-2">
-        {query.band !== "small" ? <input type="hidden" name="band" value={query.band} /> : null}
-        {query.sort !== "new" ? <input type="hidden" name="sort" value={query.sort} /> : null}
+        {query.online ? <input type="hidden" name="o" value={query.online} /> : null}
+        {query.band !== "all" ? <input type="hidden" name="band" value={query.band} /> : null}
+        {query.sort !== DEFAULT_SORT ? <input type="hidden" name="sort" value={query.sort} /> : null}
         <input
           name="q"
           defaultValue={query.q ?? ""}
@@ -88,12 +113,26 @@ async function Board({ searchParams }: { searchParams: SP }) {
         ) : null}
       </form>
 
+      {/* Discovery axis: bands of the logged-in viewer count. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={href({ online: null })} className={chip(query.online === null)}>
+          全部
+        </Link>
+        {ONLINE_BANDS.map((b) => (
+          <Link key={b} href={href({ online: b })} className={chip(query.online === b)}>
+            {ONLINE_LABEL[b]} {oc ? <span className="opacity-60">{oc[ONLINE_COUNT_KEY[b]]}</span> : null}
+          </Link>
+        ))}
+        {oc && oc.unknown > 0 ? <span className="text-xs text-muted">{oc.unknown} 间还没取到在线数</span> : null}
+      </div>
+
+      {/* Secondary: fans band and order. */}
       <div className="flex flex-wrap items-center gap-2">
         {(
           [
-            ["new", `新人 < ${BAND_LIMIT.new}`],
-            ["small", "小体量 < 1 万"],
-            ["all", "全部"],
+            ["all", "粉丝不限"],
+            ["small", "粉丝 < 1 万"],
+            ["new", `粉丝 < ${BAND_LIMIT.new}`],
           ] as [Band, string][]
         ).map(([b, label]) => (
           <Link key={b} href={href({ band: b })} className={chip(query.band === b)}>
