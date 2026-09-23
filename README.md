@@ -110,5 +110,4 @@ or artwork is used anywhere.
 
 ## License
 
-Not yet licensed. The source is public for transparency; all rights are
-reserved until a license is chosen.
+MIT. See LICENSE.
