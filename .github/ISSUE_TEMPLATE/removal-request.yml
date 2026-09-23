@@ -1,0 +1,46 @@
+name: 下架或纠错申请（观星台）
+description: 主播本人或运营：不希望出现在观星台，或信息有误
+title: "[观星台] 下架/纠错："
+labels: ["removal-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        观星台只展示 B 站的公开信息。本人或运营提出的下架，确认后会处理；我们按善意假设运营，不接受第三方代为申请。
+        这个页面是公开的，除了方便联系的账号名以外，请不要写入其他私人信息。
+  - type: input
+    id: room
+    attributes:
+      label: 房间号或 UID
+      placeholder: 例如 12958754 或 46334350
+    validations:
+      required: true
+  - type: dropdown
+    id: who
+    attributes:
+      label: 你是
+      options:
+        - 主播本人
+        - 主播的运营
+        - 其他（请在说明里写清）
+    validations:
+      required: true
+  - type: dropdown
+    id: ask
+    attributes:
+      label: 诉求
+      options:
+        - 下架（不再出现在观星台）
+        - 纠错（名字、头像、等级等信息有误）
+    validations:
+      required: true
+  - type: textarea
+    id: note
+    attributes:
+      label: 说明
+      description: 纠错请写清哪里错了；下架可以不写理由。
+  - type: input
+    id: contact
+    attributes:
+      label: 联系方式（可选）
+      description: 方便我们确认身份，例如 B 站私信可达的账号名。不填也可以。

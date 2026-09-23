@@ -22,6 +22,9 @@ export default function StarsPage({ searchParams }: { searchParams: SP }) {
             <Link href="/stars/about" className="ml-2 underline">
               我们怎么选
             </Link>
+            <Link href="/stars/check" className="ml-2 underline">
+              查一查我在不在
+            </Link>
           </p>
         </div>
       </header>

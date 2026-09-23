@@ -56,3 +56,16 @@ export async function fetchOnline(uid: number, roomId: number): Promise<number |
   const n = json.data?.onlineNum;
   return typeof n === "number" && Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
 }
+
+// room id → uid (and live status). `room_init` needs no wbi; verified 2026-09-23. Unknown room → non-zero code.
+export async function fetchRoomInit(roomId: number): Promise<{ uid: number; room_id: number; live_status: number } | null> {
+  const res = await fetch(`https://api.live.bilibili.com/room/v1/Room/room_init?id=${roomId}`, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    signal: AbortSignal.timeout(6000),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Bilibili HTTP ${res.status}`);
+  const json = (await res.json()) as { code: number; data?: { uid?: number; room_id?: number; live_status?: number } };
+  if (json.code !== 0 || !json.data?.uid) return null;
+  return { uid: json.data.uid, room_id: json.data.room_id ?? roomId, live_status: Number(json.data.live_status ?? 0) };
+}

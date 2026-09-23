@@ -1,5 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { createAnonClient } from "@/lib/supabase/anon";
+import { fetchLiveProfile, fetchRoomInit } from "@/lib/bilibili";
 
 // 观星台 read model. Gate = account level >= 3, account not deleted, seen in the
 // last STARS_STALE_MIN minutes. The raw band fetch is cached for a minute so the
@@ -232,3 +233,113 @@ export async function getWatch(roomId: number): Promise<WatchData | null> {
   };
 }
 
+
+// ---------------------------------------------------------------- /stars/check
+export type CheckResult =
+  | { kind: "invalid" }
+  | {
+      kind: "known";
+      uid: number;
+      room_id: number | null;
+      uname: string;
+      face: string;
+      level: number | null;
+      fans: number | null;
+      first_seen_at: string;
+      last_seen_at: string;
+      deleted: boolean;
+      live: { title: string; area: string; started_at: string | null } | null;
+      handle: string | null;
+      now: number;
+    }
+  | { kind: "unknown"; uid: number; room_id: number | null; uname: string; area: string; live_status: number }
+  | { kind: "missing"; input: number }
+  | { kind: "unavailable"; input: number };
+
+/** Parse digits, a live.bilibili.com/<room> URL or a space.bilibili.com/<uid> URL. */
+export function parseCheckInput(raw: string): { n: number; hint: "room" | "uid" | null } | null {
+  const s = raw.trim();
+  let m = /live\.bilibili\.com\/(?:h5\/)?(\d{1,12})/.exec(s);
+  if (m) return { n: Number(m[1]), hint: "room" };
+  m = /space\.bilibili\.com\/(\d{1,16})/.exec(s);
+  if (m) return { n: Number(m[1]), hint: "uid" };
+  if (/^\d{1,16}$/.test(s)) return { n: Number(s), hint: null };
+  return null;
+}
+
+type KnownRow = {
+  uid: number;
+  room_id: number | null;
+  uname: string;
+  face: string;
+  level: number | null;
+  fans: number | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  deleted_at: string | null;
+};
+
+/** Everything the check page needs for one room id / uid. Never throws; Bilibili failure → "unavailable". */
+export async function getCheck(raw: string): Promise<CheckResult> {
+  const parsed = parseCheckInput(raw);
+  if (!parsed) return { kind: "invalid" };
+  const { n, hint } = parsed;
+  const sb = createAnonClient();
+  const cols = "uid, room_id, uname, face, level, fans, first_seen_at, last_seen_at, deleted_at";
+  let row: KnownRow | null = null;
+  if (hint !== "uid") {
+    const { data } = await sb.from("bili_streamer").select(cols).eq("room_id", n).limit(1).maybeSingle<KnownRow>();
+    row = data ?? null;
+  }
+  if (!row && hint !== "room") {
+    const { data } = await sb.from("bili_streamer").select(cols).eq("uid", n).maybeSingle<KnownRow>();
+    row = data ?? null;
+  }
+  if (row) {
+    const [{ data: live }, { data: claimed }] = await Promise.all([
+      sb
+        .from("live_now")
+        .select("title, area, started_at, seen_at")
+        .eq("uid", row.uid)
+        .gt("seen_at", new Date(Date.now() - STARS_STALE_MIN * 60 * 1000).toISOString())
+        .maybeSingle<{ title: string; area: string; started_at: string | null; seen_at: string }>(),
+      sb.from("streamer").select("handle").eq("bili_uid", row.uid).eq("status", "active").maybeSingle<{ handle: string }>(),
+    ]);
+    return {
+      kind: "known",
+      uid: row.uid,
+      room_id: row.room_id,
+      uname: row.uname,
+      face: row.face,
+      level: row.level,
+      fans: row.fans,
+      first_seen_at: row.first_seen_at,
+      last_seen_at: row.last_seen_at,
+      deleted: row.deleted_at !== null,
+      live: live ? { title: live.title, area: live.area, started_at: live.started_at } : null,
+      handle: claimed?.handle ?? null,
+      now: Date.now(),
+    };
+  }
+  // Not observed yet: ask Bilibili whether the id exists at all.
+  try {
+    let uid = n;
+    let roomId: number | null = null;
+    let liveStatus = 0;
+    if (hint !== "uid") {
+      const init = await fetchRoomInit(n);
+      if (init) {
+        uid = init.uid;
+        roomId = init.room_id;
+        liveStatus = init.live_status;
+      } else if (hint === "room") {
+        return { kind: "missing", input: n };
+      }
+    }
+    const p = await fetchLiveProfile(uid);
+    if (!p.uname) return { kind: "missing", input: n };
+    return { kind: "unknown", uid, room_id: roomId ?? p.room_id, uname: p.uname, area: p.area, live_status: liveStatus || p.live_status };
+  } catch {
+    return { kind: "unavailable", input: n };
+  }
+}
