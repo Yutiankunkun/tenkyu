@@ -20,5 +20,5 @@ export async function GET(request: NextRequest) {
     ok = !error;
   }
 
-  return NextResponse.redirect(new URL(ok ? "/edit" : "/login?error=callback", origin));
+  return NextResponse.redirect(new URL(ok ? "/studio/edit" : "/studio/login?error=callback", origin));
 }

@@ -23,7 +23,7 @@ async function requestOrigin(): Promise<string> {
  */
 export async function requestMagicLink(formData: FormData) {
   const parsed = EmailSchema.safeParse(formData.get("email"));
-  if (!parsed.success) redirect("/login?error=email");
+  if (!parsed.success) redirect("/studio/login?error=email");
   const email = parsed.data;
 
   const admin = createAdminClient();
@@ -34,7 +34,7 @@ export async function requestMagicLink(formData: FormData) {
     .maybeSingle();
   if (error) {
     console.error("[login] allowlist lookup failed", error);
-    redirect("/login?error=server");
+    redirect("/studio/login?error=server");
   }
 
   if (streamer) {
@@ -47,12 +47,12 @@ export async function requestMagicLink(formData: FormData) {
     if (otpErr) {
       // Server log only; the client gets a coarse reason (rate limit vs other).
       console.error("[login] signInWithOtp failed", { status: otpErr.status, code: otpErr.code, message: otpErr.message });
-      redirect(otpErr.status === 429 ? "/login?error=ratelimit" : "/login?error=send");
+      redirect(otpErr.status === 429 ? "/studio/login?error=ratelimit" : "/studio/login?error=send");
     }
     console.info("[login] magic link requested", { redirectTo: `${origin}/auth/callback` });
   } else {
     console.warn("[login] email not on allowlist");
   }
 
-  redirect("/login?sent=1");
+  redirect("/studio/login?sent=1");
 }

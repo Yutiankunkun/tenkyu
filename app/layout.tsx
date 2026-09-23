@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_SC } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { SiteFooter } from "@/components/site-footer";
-import { SiteHeader } from "@/components/site-header";
 import { TzProvider } from "@/components/tz-provider";
 import "./globals.css";
 
@@ -38,11 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN" className={`${notoSC.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-bg text-fg">
-        <TzProvider>
-          <SiteHeader />
-          {children}
-          <SiteFooter />
-        </TzProvider>
+        <TzProvider>{children}</TzProvider>
         <Analytics />
       </body>
     </html>

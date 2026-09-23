@@ -18,7 +18,7 @@ export default function Home() {
           <Link href="/w" className="rounded-md bg-fg px-4 py-2 text-sm font-medium text-bg hover:opacity-90">
             打开合并日程
           </Link>
-          <Link href="/apply" className="rounded-md border border-line px-4 py-2 text-sm hover:bg-fg/5">
+          <Link href="/studio/apply" className="rounded-md border border-line px-4 py-2 text-sm hover:bg-fg/5">
             我是主播，申请入驻
           </Link>
         </div>

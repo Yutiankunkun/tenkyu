@@ -15,7 +15,7 @@ import type { Slot, SlotTemplateRow, StreamerRow, WeekOverrideRow } from "@/lib/
 // ---------------------------------------------------------------------------
 async function requireOwner(): Promise<StreamerRow> {
   const s = await getOwnerStreamer();
-  if (!s) redirect("/login");
+  if (!s) redirect("/studio/login");
   return s;
 }
 
@@ -27,7 +27,7 @@ async function afterScheduleChange(streamer: StreamerRow) {
   updateTag(scheduleTag(streamer.handle));
   updateTag(STREAMERS_TAG); // name / avatar / intro feed the home list and pickers
   await maybeActivate(streamer);
-  revalidatePath("/edit");
+  revalidatePath("/studio/edit");
 }
 
 /** invited → active once the profile has a name and ≥1 template slot. Service role (guarded column). */
@@ -138,7 +138,7 @@ export async function saveProfile(formData: FormData) {
     .eq("id", streamer.id);
   if (error) fail("保存失败：" + error.message);
   await afterScheduleChange(streamer);
-  redirect("/edit?saved=profile");
+  redirect("/studio/edit?saved=profile");
 }
 
 // ---------------------------------------------------------------------------

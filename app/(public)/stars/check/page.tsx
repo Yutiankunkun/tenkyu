@@ -155,7 +155,7 @@ function ResultCard({ r, raw }: { r: CheckResult; raw: string }) {
             看本周安排
           </Link>
         ) : (
-          <Link href="/apply" className="rounded-md border border-line px-3 py-2 hover:bg-fg/5">
+          <Link href="/studio/apply" className="rounded-md border border-line px-3 py-2 hover:bg-fg/5">
             申请入驻
           </Link>
         )}

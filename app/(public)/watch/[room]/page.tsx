@@ -120,7 +120,7 @@ async function Watch({ params }: { params: Params }) {
         ) : (
           <p className="mt-4 text-sm text-muted">
             这是你的直播间？
-            <Link href="/apply" className="underline">
+            <Link href="/studio/apply" className="underline">
               申请入驻
             </Link>
             ，就能有自己维护的日程页。

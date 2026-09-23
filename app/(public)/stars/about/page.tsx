@@ -28,7 +28,7 @@ export default function StarsAboutPage() {
         <h2 className="pt-2 text-lg font-semibold">主播可以做什么</h2>
         <p>
           出现在这里不需要任何操作。如果你想有一个自己维护的日程页，并在卡片上显示「已入驻」，可以
-          <Link href="/apply" className="underline">
+          <Link href="/studio/apply" className="underline">
             申请入驻
           </Link>
           。入驻是审核制，不收费。

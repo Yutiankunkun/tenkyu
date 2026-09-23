@@ -11,7 +11,7 @@ import { HANDLE_RE } from "@/lib/types";
 
 async function requireAdmin() {
   const email = await currentAdminEmail();
-  if (!email) redirect("/login");
+  if (!email) redirect("/studio/login");
   return email;
 }
 
