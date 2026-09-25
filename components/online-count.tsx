@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatOnline } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n/client";
 
 /**
- * Online count for a live room: logged-in viewers from Bilibili's contribution-rank count, refreshed every
- * minute while the page is visible. Renders nothing until the first answer, and nothing at
- * all if the endpoint is unavailable — the page must never depend on it.
+ * Online count for a live room: logged-in viewers from Bilibili's contribution-rank count,
+ * refreshed every minute while the page is visible. Renders nothing until the first answer,
+ * and nothing at all if the endpoint is unavailable — the page must never depend on it.
  */
 export function OnlineCount({ uid, room }: { uid: number; room: number }) {
+  const { locale, m } = useI18n();
   const [online, setOnline] = useState<number | null>(null);
 
   useEffect(() => {
@@ -41,10 +44,5 @@ export function OnlineCount({ uid, room }: { uid: number; room: number }) {
   }, [uid, room]);
 
   if (online === null) return null;
-  return (
-    <span title="登录用户在线数，来自 B 站高能榜；游客不计入。约每分钟更新。">
-      {" · 在线 "}
-      {online.toLocaleString("zh-CN")}
-    </span>
-  );
+  return <span title={m.watch.onlineTitle}>{` · ${formatOnline(online, m, locale)}`}</span>;
 }

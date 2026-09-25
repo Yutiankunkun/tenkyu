@@ -7,20 +7,29 @@ import { Avatar } from "@/components/avatar";
 import { FavButton } from "@/components/fav-button";
 import { OnlineCount } from "@/components/online-count";
 import { PlayerGate } from "@/components/player-gate";
-import { formatFans, formatLive, getWatch, minutesLive, topicOf } from "@/lib/stars";
+import { fmt, formatFans, formatLive, getMessages, isLocale, localePath, type Locale } from "@/lib/i18n";
+import { getWatch } from "@/lib/stars";
+import { minutesLive, topicOf } from "@/lib/stars-shared";
 
-type Params = Promise<{ room: string }>;
+type Params = Promise<{ locale: string; room: string }>;
+
+const localeOf = (raw: string): Locale => (isLocale(raw) ? raw : "zh-CN");
 
 function parseRoom(s: string): number | null {
   return /^\d{1,12}$/.test(s) ? Number(s) : null;
 }
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const room = parseRoom((await params).room);
+  const p = await params;
+  const m = getMessages(localeOf(p.locale));
+  const room = parseRoom(p.room);
   if (!room) return {};
   const w = await getWatch(room).catch(() => null);
-  if (!w) return { title: "观看" };
-  return { title: w.live ? `${w.uname} 的直播` : w.uname, description: w.live?.title ?? `${w.uname} 的 B 站直播间` };
+  if (!w) return { title: m.watch.fallbackTitle };
+  return {
+    title: w.live ? fmt(m.watch.metaLive, { name: w.uname }) : w.uname,
+    description: w.live?.title ?? fmt(m.watch.metaOffDescription, { name: w.uname }),
+  };
 }
 
 export default function WatchPage({ params }: { params: Params }) {
@@ -34,7 +43,10 @@ export default function WatchPage({ params }: { params: Params }) {
 }
 
 async function Watch({ params }: { params: Params }) {
-  const room = parseRoom((await params).room);
+  const p = await params;
+  const locale = localeOf(p.locale);
+  const m = getMessages(locale);
+  const room = parseRoom(p.room);
   if (!room) notFound();
   await connection();
   const w = await getWatch(room).catch(() => null);
@@ -52,9 +64,9 @@ async function Watch({ params }: { params: Params }) {
           <PlayerGate roomId={w.room_id} name={w.uname} poster={w.live.cover || w.live.keyframe} />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-400">
-            <span>现在没有在播</span>
+            <span>{m.watch.offline}</span>
             <a href={roomUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline">
-              去直播间看看
+              {m.watch.goLook}
             </a>
           </div>
         )}
@@ -63,17 +75,17 @@ async function Watch({ params }: { params: Params }) {
       <div className="px-4 sm:px-0">
         {/* title row */}
         <div className="mt-4">
-          <h1 className="text-lg font-semibold leading-snug sm:text-xl">{w.live ? w.live.title : `${w.uname} 的直播间`}</h1>
+          <h1 className="text-lg font-semibold leading-snug sm:text-xl">{w.live ? w.live.title : fmt(m.watch.roomOf, { name: w.uname })}</h1>
           <p className="mt-1 text-sm text-muted">
             {w.live ? (
               <>
-                直播中
-                {mins !== null ? ` · 已播 ${formatLive(mins)}` : ""}
-                {w.live.area ? ` · ${topicOf(w.live.area)}` : ""}
+                {m.watch.liveNow}
+                {mins !== null ? ` · ${fmt(m.units.liveFor, { t: formatLive(mins, m) })}` : ""}
+                {w.live.area ? ` · ${m.topics[topicOf(w.live.area)]}` : ""}
                 <OnlineCount uid={w.uid} room={w.room_id} />
               </>
             ) : (
-              "未在播"
+              m.watch.notLive
             )}
           </p>
         </div>
@@ -90,26 +102,26 @@ async function Watch({ params }: { params: Params }) {
               </a>
             </div>
             <div className="text-sm text-muted">
-              {formatFans(w.fans)}
-              {w.level !== null ? ` · 账号 ${w.level} 级` : ""}
-              {w.weeks_observed >= 1 ? ` · 观测 ${w.weeks_observed} 周` : ""}
+              {formatFans(w.fans, m, locale)}
+              {w.level !== null ? ` · ${fmt(m.units.level, { n: w.level })}` : ""}
+              {w.weeks_observed >= 1 ? ` · ${fmt(m.units.weeks, { n: w.weeks_observed })}` : ""}
             </div>
           </div>
           <div className="flex items-center gap-2">
             <FavButton uid={w.uid} name={w.uname} />
             <a href={roomUrl} target="_blank" rel="noopener noreferrer" className="rounded-md bg-fg px-3 py-2 text-sm font-medium text-bg hover:opacity-90">
-              去直播间
+              {m.watch.goRoom}
             </a>
             <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">
-              B 站主页
+              {m.watch.space}
             </a>
           </div>
         </div>
 
         <p className="mt-6 text-xs text-muted">
-          官方嵌入播放器，只能看。发弹幕、上舰请去直播间。信息来自 B 站公开接口，约每 10 分钟更新；「在线」是登录用户数，约每分钟更新。
-          <Link href="/" className="ml-2 underline">
-            回观星台
+          {m.watch.footnote}
+          <Link href={localePath(locale, "/")} className="ml-2 underline">
+            {m.watch.back}
           </Link>
         </p>
       </div>

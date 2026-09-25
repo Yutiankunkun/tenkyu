@@ -1,5 +1,7 @@
 "use client";
 
+import { fmt } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n/client";
 import { useLocalString, writeLocal } from "@/lib/local-store";
 
 export const FAVS_KEY = "tenkyu:favs";
@@ -16,6 +18,7 @@ export function parseFavs(raw: string | null): number[] {
 
 /** ♡ stored in this browser only (uid list). No account, nothing uploaded. */
 export function FavButton({ uid, name, size = "md" }: { uid: number; name: string; size?: "sm" | "md" }) {
+  const { m } = useI18n();
   const favs = parseFavs(useLocalString(FAVS_KEY));
   const on = favs.includes(uid);
   function toggle(e: React.MouseEvent) {
@@ -30,8 +33,8 @@ export function FavButton({ uid, name, size = "md" }: { uid: number; name: strin
       type="button"
       onClick={toggle}
       aria-pressed={on}
-      aria-label={on ? `取消收藏 ${name}` : `收藏 ${name}`}
-      title={on ? "已收藏（仅保存在这个浏览器）" : "收藏（仅保存在这个浏览器）"}
+      aria-label={fmt(on ? m.fav.remove : m.fav.add, { name })}
+      title={on ? m.fav.titleOn : m.fav.titleOff}
       className={`inline-flex shrink-0 items-center justify-center rounded-full border leading-none ${dims} ${
         on ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:text-fg"
       }`}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fmt } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n/client";
 
 type Props = { roomId: number; name: string; poster: string };
 
@@ -11,6 +13,7 @@ type Props = { roomId: number; name: string; poster: string };
  * cleaned up, or the audio keeps playing on the next page.
  */
 export function PlayerGate({ roomId, name, poster }: Props) {
+  const { m } = useI18n();
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
@@ -22,7 +25,7 @@ export function PlayerGate({ roomId, name, poster }: Props) {
     return (
       <iframe
         src={`https://www.bilibili.com/blackboard/live/live-activity-player.html?cid=${roomId}&quality=0`}
-        title={`${name} 的直播`}
+        title={fmt(m.player.iframeTitle, { name })}
         className="h-full w-full"
         allow="autoplay; fullscreen; picture-in-picture"
         allowFullScreen
@@ -34,7 +37,7 @@ export function PlayerGate({ roomId, name, poster }: Props) {
       type="button"
       onClick={() => setPlaying(true)}
       className="group relative block h-full w-full overflow-hidden text-left"
-      aria-label={`播放 ${name} 的直播`}
+      aria-label={fmt(m.player.play, { name })}
     >
       {poster ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -45,7 +48,7 @@ export function PlayerGate({ roomId, name, poster }: Props) {
           ▶
         </span>
       </span>
-      <span className="absolute bottom-3 left-3 rounded bg-black/60 px-2 py-1 text-xs text-white">点击播放 · 官方播放器</span>
+      <span className="absolute bottom-3 left-3 rounded bg-black/60 px-2 py-1 text-xs text-white">{m.player.hint}</span>
     </button>
   );
 }

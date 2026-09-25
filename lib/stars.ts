@@ -14,21 +14,23 @@ import {
   type Band,
   type OnlineBand,
   type OnlineCounts,
+  TOPIC_KEY_OF_SQL,
+  TOPIC_SQL,
   type Sort,
   type StarRow,
-  type Topic,
+  type TopicKey,
 } from "@/lib/stars-shared";
 
 export * from "@/lib/stars-shared";
 
-export type StarsQuery = { band: Band; online: OnlineBand | null; topic: Topic | null; q: string | null; sort: Sort; page: number; size?: number };
+export type StarsQuery = { band: Band; online: OnlineBand | null; topic: TopicKey | null; q: string | null; sort: Sort; page: number; size?: number };
 
 export type StarsResult = {
   rows: StarRow[]; // current page only
   total: number;
   page: number;
   pages: number;
-  topics: { topic: Topic; n: number }[];
+  topics: { topic: TopicKey; n: number }[];
   onlineCounts: OnlineCounts | null;
   updatedAt: string | null;
   now: number;
@@ -36,7 +38,7 @@ export type StarsResult = {
 
 const escapeLike = (s: string) => s.replace(/[\%_]/g, (c) => "\\" + c);
 
-type StarsPageRpc = { total: number; topics: { topic: Topic; n: number }[]; online: OnlineCounts | null; updated_at: string | null; rows: StarRow[] };
+type StarsPageRpc = { total: number; topics: { topic: string; n: number }[]; online: OnlineCounts | null; updated_at: string | null; rows: StarRow[] };
 
 /** One database call (migrations 0006–0009). Cached briefly per distinct query. */
 async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResult> {
@@ -47,7 +49,7 @@ async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResul
   const sb = createAnonClient();
   const { data, error } = await sb.rpc("stars_page", {
     p_fans_lt: BAND_LIMIT[query.band],
-    p_topic: query.topic,
+    p_topic: query.topic ? TOPIC_SQL[query.topic] : null,
     p_q: query.q ? escapeLike(query.q) : null,
     p_sort: query.sort,
     p_page: Math.max(1, query.page),
@@ -65,7 +67,7 @@ async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResul
     total: r.total,
     page: Math.min(Math.max(1, query.page), pages),
     pages,
-    topics: r.topics ?? [],
+    topics: (r.topics ?? []).flatMap((t) => (TOPIC_KEY_OF_SQL[t.topic] ? [{ topic: TOPIC_KEY_OF_SQL[t.topic], n: t.n }] : [])),
     onlineCounts: r.online ?? null,
     updatedAt: r.updated_at,
     now: Date.now(),
