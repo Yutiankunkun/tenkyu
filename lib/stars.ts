@@ -75,7 +75,12 @@ async function starsPageRpc(query: StarsQuery, size: number): Promise<StarsResul
 }
 
 export async function getStars(query: StarsQuery): Promise<StarsResult> {
-  return starsPageRpc(query, query.size ?? PAGE_SIZE);
+  const size = query.size ?? PAGE_SIZE;
+  if (query.online === null) return starsPageRpc(query, size);
+  // The SQL function counts bands after applying the band filter, so the other tabs would read 0.
+  // Fetch the unfiltered counts alongside (one tiny cached call) until the function is changed.
+  const [page, all] = await Promise.all([starsPageRpc(query, size), starsPageRpc({ ...query, online: null, page: 1 }, 1)]);
+  return { ...page, onlineCounts: all.onlineCounts };
 }
 
 /** Live rows for specific uids (favourites view), gate applied. */

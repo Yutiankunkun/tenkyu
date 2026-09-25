@@ -4,6 +4,7 @@ import Link from "next/link";
 import { StarCard } from "@/components/star-card";
 import { fmt, formatClock } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
+import { DENSITY_GRID, useDensity } from "@/lib/prefs";
 import type { StarRow } from "@/lib/stars-shared";
 
 type Props = {
@@ -19,6 +20,7 @@ type Props = {
 /** Observatory card grid (Holodex layout: fluid columns of 16:9 cards, no card chrome). */
 export function StarsGrid({ rows, total, page, pages, pageBase, now, updatedAt }: Props) {
   const { locale, m } = useI18n();
+  const density = useDensity();
   const pageHref = (p: number) => (p <= 1 ? pageBase : `${pageBase}${pageBase.includes("?") ? "&" : "?"}p=${p}`);
 
   return (
@@ -31,7 +33,7 @@ export function StarsGrid({ rows, total, page, pages, pageBase, now, updatedAt }
       {rows.length === 0 ? (
         <p className="text-muted">{updatedAt ? m.grid.emptyFilter : m.grid.noData}</p>
       ) : (
-        <ul className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <ul className={DENSITY_GRID[density]}>
           {rows.map((r) => (
             <li key={r.uid}>
               <StarCard r={r} now={now} />

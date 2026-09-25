@@ -36,6 +36,10 @@ export default async function AboutPage({ params }: { params: Params }) {
           </Link>
           {m.about.checkText2}
         </p>
+        <h2 className="pt-2 text-lg font-semibold">{m.about.privacyTitle}</h2>
+        {m.about.privacy.map((p) => (
+          <p key={p.slice(0, 24)}>{p}</p>
+        ))}
       </div>
     </main>
   );

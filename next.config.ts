@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
       { source: "/stars", destination: "/", permanent: true },
       { source: "/stars/about", destination: "/about", permanent: true },
       { source: "/stars/check", destination: "/check", permanent: true },
+      { source: "/privacy", destination: "/about", permanent: true },
+      { source: "/en/privacy", destination: "/en/about", permanent: true },
       ...gone.map((p) => ({ source: "/" + p, destination: "/", permanent: true })),
     ];
   },

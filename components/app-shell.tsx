@@ -3,38 +3,68 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { IconCheck, IconClose, IconHeart, IconHome, IconInfo, IconMenu, IconSearch } from "@/components/icons";
-import { LangSwitch } from "@/components/lang-switch";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { DrawerFavorites } from "@/components/drawer-favorites";
+import { IconBack, IconBilibili, IconCheck, IconGitHub, IconHeart, IconHome, IconInfo, IconMenu, IconSearch, IconSettings } from "@/components/icons";
 import { isLocale, localePath, type Locale } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
+import { setDrawerMini, useDrawerMini } from "@/lib/prefs";
+import { AUTHOR_BILIBILI_URL, GITHUB_URL } from "@/lib/site";
 
 /**
- * Holodex skeleton: 56 px app bar, 220 px left drawer (persistent from lg, overlay below),
- * bottom navigation on phones. Route-aware highlighting reads the URL, so it sits in Suspense.
+ * Holodex skeleton: 56 px app bar with a centred search, 220 px left drawer (persistent from
+ * lg and collapsible to a 56 px icon rail; overlay below lg), bottom navigation on phones.
+ * Anything that reads the URL sits inside <Suspense>.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locale, m } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // overlay drawer (below lg)
+  const [searchOpen, setSearchOpen] = useState(false); // phone search
+  const mini = useDrawerMini(); // desktop rail
   const close = useCallback(() => setOpen(false), []);
   const home = localePath(locale, "/");
+  const toggle = () => {
+    // Below lg the button opens the overlay; from lg it collapses/expands the rail.
+    if (window.matchMedia("(min-width: 1024px)").matches) setDrawerMini(!mini);
+    else setOpen((v) => !v);
+  };
+  const railW = mini ? "lg:w-14" : "lg:w-[220px]";
+  const contentPad = mini ? "lg:pl-14" : "lg:pl-[220px]";
 
   return (
     <div className="min-h-full">
       <header className="fixed inset-x-0 top-0 z-40 h-14 bg-bar text-bar-fg shadow-md">
-        <div className="flex h-14 items-center gap-2 px-2 sm:px-3">
-          <button type="button" onClick={() => setOpen(true)} className="rounded-full p-2 hover:bg-white/10 lg:hidden" aria-label={m.nav.menu}>
-            <IconMenu className="h-6 w-6" />
-          </button>
-          <Link href={home} className="flex items-center gap-2 px-1 text-xl font-semibold tracking-tight">
-            <span className="inline-block h-5 w-5 rounded-full border-[3px] border-white/90" aria-hidden />
-            <span>
-              {m.site.short}
-              <span className="ml-1 hidden text-sm font-normal opacity-80 sm:inline">{m.site.latin}</span>
-            </span>
-          </Link>
-          <form action={home} method="get" className="mx-auto hidden w-full max-w-xl items-center sm:flex">
-            <label className="relative w-full">
+        {searchOpen ? (
+          <form action={home} method="get" className="flex h-14 items-center gap-1 px-2 sm:hidden">
+            <button type="button" onClick={() => setSearchOpen(false)} className="rounded-full p-2 hover:bg-white/10" aria-label={m.nav.closeSearch}>
+              <IconBack className="h-6 w-6" />
+            </button>
+            <input
+              name="q"
+              autoFocus
+              placeholder={m.nav.search}
+              maxLength={40}
+              className="h-9 min-w-0 flex-1 rounded-md border border-white/20 bg-black/25 px-3 text-sm text-white placeholder:text-white/60 focus:bg-black/35 focus:outline-none"
+            />
+            <button type="submit" className="rounded-full p-2 hover:bg-white/10" aria-label={m.board.search}>
+              <IconSearch className="h-6 w-6" />
+            </button>
+          </form>
+        ) : null}
+        <div className={`grid h-14 grid-cols-[1fr_auto_1fr] items-center px-2 sm:px-3 ${searchOpen ? "hidden sm:grid" : ""}`}>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={toggle} className="rounded-full p-2 hover:bg-white/10" aria-label={m.nav.menu}>
+              <IconMenu className="h-6 w-6" />
+            </button>
+            <Link href={home} className="flex items-center gap-2 px-1 text-xl font-semibold tracking-tight">
+              <span className="inline-block h-5 w-5 rounded-full border-[3px] border-white/90" aria-hidden />
+              <span>
+                {m.site.short}
+                <span className="ml-1 hidden text-sm font-normal opacity-80 sm:inline">{m.site.latin}</span>
+              </span>
+            </Link>
+          </div>
+          <form action={home} method="get" className="hidden w-[min(555px,40vw)] sm:block">
+            <label className="relative block w-full">
               <input
                 name="q"
                 placeholder={m.nav.search}
@@ -46,44 +76,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </label>
           </form>
-          <div className="ml-auto flex items-center gap-1">
-            <Link href={localePath(locale, "/?focus=search")} className="rounded-full p-2 hover:bg-white/10 sm:hidden" aria-label={m.board.search}>
+          <div className="flex items-center justify-end gap-1">
+            <button type="button" onClick={() => setSearchOpen(true)} className="rounded-full p-2 hover:bg-white/10 sm:hidden" aria-label={m.board.search}>
               <IconSearch className="h-6 w-6" />
+            </button>
+            <Link href={localePath(locale, "/settings")} className="rounded-full p-2 hover:bg-white/10" aria-label={m.nav.settings}>
+              <IconSettings className="h-6 w-6" />
             </Link>
-            <ThemeToggle className="rounded-full p-2 hover:bg-white/10" />
-            <Suspense fallback={<span className="w-10" />}>
-              <LangSwitch className="rounded-full px-2 py-2 text-sm hover:bg-white/10" />
-            </Suspense>
           </div>
         </div>
       </header>
 
       {/* Drawer */}
-      {open ? <button type="button" aria-label={m.nav.menu} onClick={() => setOpen(false)} className="fixed inset-0 z-40 bg-black/50 lg:hidden" /> : null}
+      {open ? <button type="button" aria-label={m.nav.menu} onClick={close} className="fixed inset-0 z-40 bg-black/50 lg:hidden" /> : null}
       <aside
-        className={`fixed bottom-0 left-0 top-14 z-50 w-[220px] transform bg-nav text-fg transition-transform lg:z-30 lg:translate-x-0 ${
+        className={`scroll-thin fixed bottom-0 left-0 top-14 z-50 w-[220px] transform overflow-y-auto bg-nav text-fg transition-[transform,width] lg:z-30 lg:translate-x-0 ${railW} ${
           open ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between px-3 py-2 lg:hidden">
-            <span className="text-sm text-muted">{m.nav.menu}</span>
-            <button type="button" onClick={() => setOpen(false)} className="rounded-full p-1 hover:bg-fg/10" aria-label={m.nav.menu}>
-              <IconClose className="h-5 w-5" />
-            </button>
-          </div>
-          <Suspense fallback={<NavList locale={locale} active={null} onNavigate={close} />}>
-            <RouteAwareNav locale={locale} onNavigate={close} />
+        <div className="flex min-h-full flex-col">
+          <Suspense fallback={<NavList locale={locale} active={null} mini={mini} onNavigate={close} />}>
+            <RouteAwareNav locale={locale} mini={mini} onNavigate={close} />
           </Suspense>
-          <div className="mt-auto space-y-1 border-t border-line px-4 py-3 text-xs text-faint">
-            <div>{m.footer.copyright}</div>
-            <div>{m.footer.timezone}</div>
+          {!mini ? <DrawerFavorites onNavigate={close} /> : null}
+          <div className={`mt-auto border-t border-line px-3 py-3 text-xs text-faint ${mini ? "lg:px-0 lg:text-center" : ""}`}>
+            <div className={`flex items-center gap-2 ${mini ? "lg:flex-col" : ""}`}>
+              <a href={AUTHOR_BILIBILI_URL} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-muted hover:text-fg" aria-label={m.nav.bilibili} title={m.nav.bilibili}>
+                <IconBilibili className="h-5 w-5" />
+              </a>
+              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-muted hover:text-fg" aria-label={m.nav.github} title={m.nav.github}>
+                <IconGitHub className="h-5 w-5" />
+              </a>
+              <Link href={localePath(locale, "/settings")} onClick={close} className={`ml-auto text-accent hover:underline ${mini ? "lg:hidden" : ""}`}>
+                {m.nav.switch}
+              </Link>
+            </div>
+            <div className={`mt-2 ${mini ? "lg:hidden" : ""}`}>{m.nav.copyright}</div>
           </div>
         </div>
       </aside>
 
       {/* Content */}
-      <div className="pt-14 lg:pl-[220px]">
+      <div className={`pt-14 transition-[padding] ${contentPad}`}>
         <main className="min-h-[calc(100vh-56px)] pb-16 lg:pb-0">{children}</main>
       </div>
 
@@ -97,13 +131,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-type Key = "board" | "favorites" | "check" | "about";
+type Key = "board" | "favorites" | "check" | "about" | "settings";
 const ITEMS: { key: Key; path: string; Icon: (p: { className?: string }) => React.JSX.Element }[] = [
   { key: "board", path: "/", Icon: IconHome },
   { key: "favorites", path: "/favorites", Icon: IconHeart },
   { key: "check", path: "/check", Icon: IconCheck },
   { key: "about", path: "/about", Icon: IconInfo },
+  { key: "settings", path: "/settings", Icon: IconSettings },
 ];
+const BOTTOM: Key[] = ["board", "favorites", "check", "about"];
 
 function activeKey(pathname: string): Key | null {
   const first = pathname.split("/")[1] ?? "";
@@ -114,7 +150,7 @@ function activeKey(pathname: string): Key | null {
   return hit ? hit.key : null;
 }
 
-function RouteAwareNav({ locale, onNavigate }: { locale: Locale; onNavigate: () => void }) {
+function RouteAwareNav({ locale, mini, onNavigate }: { locale: Locale; mini: boolean; onNavigate: () => void }) {
   const pathname = usePathname() ?? "/";
   const active = activeKey(pathname);
   // Close the overlay drawer when the route changes (not on mount, not on unrelated re-renders).
@@ -124,10 +160,10 @@ function RouteAwareNav({ locale, onNavigate }: { locale: Locale; onNavigate: () 
     prev.current = pathname;
     onNavigate();
   }, [pathname, onNavigate]);
-  return <NavList locale={locale} active={active} onNavigate={onNavigate} />;
+  return <NavList locale={locale} active={active} mini={mini} onNavigate={onNavigate} />;
 }
 
-function NavList({ locale, active, onNavigate }: { locale: Locale; active: Key | null; onNavigate: () => void }) {
+function NavList({ locale, active, mini, onNavigate }: { locale: Locale; active: Key | null; mini: boolean; onNavigate: () => void }) {
   const { m } = useI18n();
   return (
     <ul className="px-2 py-1">
@@ -138,20 +174,16 @@ function NavList({ locale, active, onNavigate }: { locale: Locale; active: Key |
             <Link
               href={localePath(locale, path)}
               onClick={onNavigate}
-              className={`flex h-10 items-center gap-4 rounded-md px-3 text-[15px] ${on ? "bg-fg/10 font-medium text-accent" : "text-fg/90 hover:bg-fg/5"}`}
+              title={m.nav[key]}
+              className={`flex h-10 items-center gap-4 rounded-md px-3 text-[15px] ${on ? "bg-fg/10 font-medium text-accent" : "text-fg/90 hover:bg-fg/5"} ${mini ? "lg:justify-center lg:px-0" : ""}`}
               aria-current={on ? "page" : undefined}
             >
-              <Icon className="h-6 w-6" />
-              <span>{m.nav[key]}</span>
+              <Icon className="h-6 w-6 shrink-0" />
+              <span className={mini ? "lg:hidden" : ""}>{m.nav[key]}</span>
             </Link>
           </li>
         );
       })}
-      <li className="mt-2 border-t border-line pt-2">
-        <Link href={localePath(locale, "/privacy")} onClick={onNavigate} className="flex h-9 items-center px-3 text-sm text-muted hover:text-fg">
-          {m.nav.privacy}
-        </Link>
-      </li>
     </ul>
   );
 }
@@ -165,7 +197,7 @@ function BottomItems({ locale, active }: { locale: Locale; active: Key | null })
   const { m } = useI18n();
   return (
     <>
-      {ITEMS.map(({ key, path, Icon }) => {
+      {ITEMS.filter((i) => BOTTOM.includes(i.key)).map(({ key, path, Icon }) => {
         const on = active === key;
         return (
           <Link

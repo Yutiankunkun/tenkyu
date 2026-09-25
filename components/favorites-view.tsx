@@ -8,12 +8,14 @@ import { StarCard } from "@/components/star-card";
 import { fmt, formatDay, formatFans, localePath } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import { useLocalString } from "@/lib/local-store";
+import { DENSITY_GRID, useDensity } from "@/lib/prefs";
 import type { StarRow } from "@/lib/stars-shared";
 
 type Offline = { uid: number; uname: string; face: string; room_id: number | null; fans: number | null; last_seen_at: string };
 
 export function FavoritesView() {
   const { locale, m } = useI18n();
+  const density = useDensity();
   const favs = parseFavs(useLocalString(FAVS_KEY));
   const key = favs.join(",");
   const [live, setLive] = useState<StarRow[] | null>(null);
@@ -63,7 +65,7 @@ export function FavoritesView() {
             {live.length === 0 ? (
               <p className="text-muted">{m.favorites.noneLive}</p>
             ) : (
-              <ul className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <ul className={DENSITY_GRID[density]}>
                 {live.map((r) => (
                   <li key={r.uid}>
                     <StarCard r={r} now={now ?? Date.parse(r.seen_at)} />
