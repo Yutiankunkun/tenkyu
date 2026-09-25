@@ -99,9 +99,9 @@ sit in Tokyo.
 
 ## Status
 
-Early and personal. The board, watch page, favourites and check page are
-live. Ranking by viewer count, observed-weeks badges, a visual redesign and
-UI language switching are in progress. Issues and ideas are welcome; the
+Early and personal. The board (viewer-count bands, observed-weeks ranking),
+watch page, favourites, check page, dark/light theme and Chinese/English UI
+are live. Issues and ideas are welcome; the
 product deliberately stays small.
 
 ## Name
