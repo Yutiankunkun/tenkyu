@@ -87,26 +87,34 @@ async function Watch({ params }: { params: Params }) {
             )}
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-4 border-y border-line py-4">
-            <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
-              <Avatar src={w.face} name={w.uname} size={56} />
-            </a>
-            <div className="min-w-0 flex-1">
-              <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="block truncate text-base font-semibold hover:underline">
-                {w.uname}
+          {/* Streamer row. Phones: avatar + name + ♡ on one line, buttons on the next; sm+: one line. */}
+          <div className="mt-4 flex flex-col gap-3 border-y border-line py-4 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+              <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                <Avatar src={w.face} name={w.uname} size={56} />
               </a>
-              <div className="text-[13px] text-muted">
-                {formatFans(w.fans, m, locale)}
-                {w.level !== null ? ` · ${fmt(m.units.level, { n: w.level })}` : ""}
-                {w.weeks_observed >= 1 ? ` · ${fmt(m.units.weeks, { n: w.weeks_observed })}` : ""}
+              <div className="min-w-0 flex-1">
+                <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="block truncate text-base font-semibold hover:underline">
+                  {w.uname}
+                </a>
+                <div className="truncate text-[13px] text-muted">
+                  {formatFans(w.fans, m, locale)}
+                  {w.level !== null ? ` · ${fmt(m.units.level, { n: w.level })}` : ""}
+                  {w.weeks_observed >= 1 ? ` · ${fmt(m.units.weeks, { n: w.weeks_observed })}` : ""}
+                </div>
               </div>
+              <span className="sm:hidden">
+                <FavButton uid={w.uid} name={w.uname} />
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <FavButton uid={w.uid} name={w.uname} />
-              <a href={roomUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90">
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="hidden sm:inline-flex">
+                <FavButton uid={w.uid} name={w.uname} />
+              </span>
+              <a href={roomUrl} target="_blank" rel="noopener noreferrer" className="inline-flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 sm:flex-none">
                 {m.watch.goRoom} <IconExternal className="h-4 w-4" />
               </a>
-              <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">
+              <a href={spaceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex flex-1 items-center justify-center whitespace-nowrap rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5 sm:flex-none">
                 {m.watch.space}
               </a>
             </div>
