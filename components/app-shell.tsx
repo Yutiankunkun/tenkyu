@@ -4,11 +4,30 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { DrawerFavorites } from "@/components/drawer-favorites";
-import { IconBack, IconBilibili, IconCheck, IconGitHub, IconHeart, IconHome, IconInfo, IconMenu, IconSearch, IconSettings } from "@/components/icons";
-import { isLocale, localePath, type Locale } from "@/lib/i18n";
+import { IconBack, IconBilibili, IconCheck, IconHeart, IconHome, IconInfo, IconMenu, IconSearch, IconSettings } from "@/components/icons";
+import { LOCALE_NAMES, localePath, stripLocale, type Locale } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import { setDrawerMini, useDrawerMini } from "@/lib/prefs";
-import { AUTHOR_BILIBILI_URL, GITHUB_URL } from "@/lib/site";
+import { AUTHOR_BILIBILI_URL } from "@/lib/site";
+
+const COPYRIGHT = "© 2026 Tenkyu"; // English in every locale, like Holodex's footer
+
+/** Colourful mark: a conic ring (the celestial sphere) with a dark core. */
+function Logo({ size = 22 }: { size?: number }) {
+  return (
+    <span
+      aria-hidden
+      className="inline-block rounded-full"
+      style={{
+        width: size,
+        height: size,
+        background: "conic-gradient(from 210deg, #7dd3fc, #a78bfa, #f472b6, #fbbf24, #34d399, #7dd3fc)",
+        WebkitMask: "radial-gradient(circle, transparent 46%, #000 48%)",
+        mask: "radial-gradient(circle, transparent 46%, #000 48%)",
+      }}
+    />
+  );
+}
 
 /**
  * Holodex skeleton: 56 px app bar with a centred search, 220 px left drawer (persistent from
@@ -50,22 +69,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </form>
         ) : null}
-        <div className={`grid h-14 grid-cols-[1fr_auto_1fr] items-center px-2 sm:px-3 ${searchOpen ? "hidden sm:grid" : ""}`}>
-          <div className="flex items-center gap-1">
+        <div className={`grid h-14 grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-5 ${searchOpen ? "hidden sm:grid" : ""}`}>
+          <div className="flex items-center gap-2">
             <button type="button" onClick={toggle} className="rounded-full p-2 hover:bg-white/10" aria-label={m.nav.menu}>
               <IconMenu className="h-6 w-6" />
             </button>
-            <Link href={home} className="flex items-center gap-2 px-1 text-xl font-semibold tracking-tight">
-              <span className="inline-block h-5 w-5 rounded-full border-[3px] border-white/90" aria-hidden />
-              <span>
-                {m.site.short}
-                <span className="ml-1 hidden text-sm font-normal opacity-80 sm:inline">{m.site.latin}</span>
-              </span>
+            <Link href={home} className="flex items-center gap-2.5 px-1 text-[21px] font-semibold tracking-tight">
+              <Logo />
+              <span>{m.site.short}</span>
             </Link>
           </div>
           <form action={home} method="get" className="hidden w-[min(555px,40vw)] sm:block">
             <label className="relative block w-full">
               <input
+                id="site-search"
                 name="q"
                 placeholder={m.nav.search}
                 maxLength={40}
@@ -80,9 +97,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button type="button" onClick={() => setSearchOpen(true)} className="rounded-full p-2 hover:bg-white/10 sm:hidden" aria-label={m.board.search}>
               <IconSearch className="h-6 w-6" />
             </button>
-            <Link href={localePath(locale, "/settings")} className="rounded-full p-2 hover:bg-white/10" aria-label={m.nav.settings}>
-              <IconSettings className="h-6 w-6" />
-            </Link>
           </div>
         </div>
       </header>
@@ -99,19 +113,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <RouteAwareNav locale={locale} mini={mini} onNavigate={close} />
           </Suspense>
           {!mini ? <DrawerFavorites onNavigate={close} /> : null}
-          <div className={`mt-auto border-t border-line px-3 py-3 text-xs text-faint ${mini ? "lg:px-0 lg:text-center" : ""}`}>
-            <div className={`flex items-center gap-2 ${mini ? "lg:flex-col" : ""}`}>
-              <a href={AUTHOR_BILIBILI_URL} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-muted hover:text-fg" aria-label={m.nav.bilibili} title={m.nav.bilibili}>
-                <IconBilibili className="h-5 w-5" />
+          <div className={`mt-auto px-4 py-3 text-[11px] text-faint ${mini ? "lg:px-0" : ""}`}>
+            <div className={`flex items-center gap-2 whitespace-nowrap ${mini ? "lg:flex-col lg:gap-1" : ""}`}>
+              <span className={mini ? "lg:hidden" : ""}>{COPYRIGHT}</span>
+              <a href={AUTHOR_BILIBILI_URL} target="_blank" rel="noopener noreferrer" className="rounded p-0.5 text-muted hover:text-fg" aria-label={m.nav.bilibili} title={m.nav.bilibili}>
+                <IconBilibili className="h-4 w-4" />
               </a>
-              <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="rounded p-1 text-muted hover:text-fg" aria-label={m.nav.github} title={m.nav.github}>
-                <IconGitHub className="h-5 w-5" />
-              </a>
-              <Link href={localePath(locale, "/settings")} onClick={close} className={`ml-auto text-accent hover:underline ${mini ? "lg:hidden" : ""}`}>
-                {m.nav.switch}
+              <Link href={localePath(locale, "/settings")} onClick={close} className={`text-accent hover:underline ${mini ? "lg:hidden" : ""}`}>
+                {LOCALE_NAMES[locale]}
               </Link>
             </div>
-            <div className={`mt-2 ${mini ? "lg:hidden" : ""}`}>{m.nav.copyright}</div>
           </div>
         </div>
       </aside>
@@ -139,11 +150,10 @@ const ITEMS: { key: Key; path: string; Icon: (p: { className?: string }) => Reac
   { key: "about", path: "/about", Icon: IconInfo },
   { key: "settings", path: "/settings", Icon: IconSettings },
 ];
-const BOTTOM: Key[] = ["board", "favorites", "check", "about"];
+const BOTTOM: Key[] = ["board", "favorites", "check", "settings"];
 
 function activeKey(pathname: string): Key | null {
-  const first = pathname.split("/")[1] ?? "";
-  const base = isLocale(first) ? pathname.slice(first.length + 1) || "/" : pathname;
+  const base = stripLocale(pathname);
   if (base === "/") return "board";
   const seg = `/${base.split("/")[1] ?? ""}`;
   const hit = ITEMS.find((i) => i.path === seg);
@@ -163,10 +173,11 @@ function RouteAwareNav({ locale, mini, onNavigate }: { locale: Locale; mini: boo
   return <NavList locale={locale} active={active} mini={mini} onNavigate={onNavigate} />;
 }
 
+/** Holodex list item: 40 px tall, 22 px icon, 14 px label, 16 px side padding. */
 function NavList({ locale, active, mini, onNavigate }: { locale: Locale; active: Key | null; mini: boolean; onNavigate: () => void }) {
   const { m } = useI18n();
   return (
-    <ul className="px-2 py-1">
+    <ul className="py-2">
       {ITEMS.map(({ key, path, Icon }) => {
         const on = active === key;
         return (
@@ -175,10 +186,11 @@ function NavList({ locale, active, mini, onNavigate }: { locale: Locale; active:
               href={localePath(locale, path)}
               onClick={onNavigate}
               title={m.nav[key]}
-              className={`flex h-10 items-center gap-4 rounded-md px-3 text-[15px] ${on ? "bg-fg/10 font-medium text-accent" : "text-fg/90 hover:bg-fg/5"} ${mini ? "lg:justify-center lg:px-0" : ""}`}
+              className={`relative flex h-10 items-center gap-5 px-4 text-[14px] ${on ? "bg-fg/8 font-medium text-accent" : "text-fg/85 hover:bg-fg/5"} ${mini ? "lg:justify-center lg:gap-0 lg:px-0" : ""}`}
               aria-current={on ? "page" : undefined}
             >
-              <Icon className="h-6 w-6 shrink-0" />
+              {on ? <span className="absolute inset-y-0 left-0 w-[3px] rounded-r bg-accent" aria-hidden /> : null}
+              <Icon className={`h-[22px] w-[22px] shrink-0 ${on ? "" : "text-muted"}`} />
               <span className={mini ? "lg:hidden" : ""}>{m.nav[key]}</span>
             </Link>
           </li>

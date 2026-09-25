@@ -1,15 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { THEME_KEY, applyTheme, type Theme } from "@/components/theme-toggle";
-import { LOCALES, isLocale, localePath, type Locale } from "@/lib/i18n";
+import { LOCALES, LOCALE_NAMES, langSwitchHref, stripLocale } from "@/lib/i18n";
 import { useI18n } from "@/lib/i18n/client";
 import { useLocalString, writeLocal } from "@/lib/local-store";
 import { DENSITY_GRID, setDensity, setOpenOnBilibili, useDensity, useOpenOnBilibili, type Density } from "@/lib/prefs";
-
-const LOCALE_NAME: Record<Locale, string> = { "zh-CN": "简体中文", en: "English" };
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -47,25 +44,27 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-/** Language rows link to the same page in each locale (the URL is the language state). */
+/**
+ * Language rows go through /api/lang, which records the choice in a cookie (so the first-visit
+ * auto-detection never overrides it) and lands on the same page in the chosen language.
+ * Plain anchors, not <Link>: the target is a route handler that redirects.
+ */
 function LanguageRows() {
   const { locale } = useI18n();
-  const pathname = usePathname() ?? "/";
-  const first = pathname.split("/")[1] ?? "";
-  const base = isLocale(first) ? pathname.slice(first.length + 1) || "/" : pathname;
+  const base = stripLocale(usePathname() ?? "/");
   return (
     <ul className="space-y-1">
       {LOCALES.map((l) => (
         <li key={l}>
-          <Link
-            href={localePath(l, base)}
+          <a
+            href={langSwitchHref(l, base)}
             hrefLang={l}
             className={`flex items-center justify-between rounded-md px-3 py-2 text-[14px] ${l === locale ? "bg-fg/10 text-accent" : "hover:bg-fg/5"}`}
             aria-current={l === locale ? "true" : undefined}
           >
-            <span>{LOCALE_NAME[l]}</span>
+            <span>{LOCALE_NAMES[l]}</span>
             {l === locale ? <span aria-hidden>✓</span> : null}
-          </Link>
+          </a>
         </li>
       ))}
     </ul>
