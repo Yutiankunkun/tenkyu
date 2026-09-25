@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { IconCheck, IconClose, IconHeart, IconHome, IconInfo, IconMenu, IconSearch } from "@/components/icons";
 import { LangSwitch } from "@/components/lang-switch";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n/client";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locale, m } = useI18n();
   const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   const home = localePath(locale, "/");
 
   return (
@@ -71,8 +72,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <IconClose className="h-5 w-5" />
             </button>
           </div>
-          <Suspense fallback={<NavList locale={locale} active={null} onNavigate={() => setOpen(false)} />}>
-            <RouteAwareNav locale={locale} onNavigate={() => setOpen(false)} />
+          <Suspense fallback={<NavList locale={locale} active={null} onNavigate={close} />}>
+            <RouteAwareNav locale={locale} onNavigate={close} />
           </Suspense>
           <div className="mt-auto space-y-1 border-t border-line px-4 py-3 text-xs text-faint">
             <div>{m.footer.copyright}</div>
@@ -116,8 +117,13 @@ function activeKey(pathname: string): Key | null {
 function RouteAwareNav({ locale, onNavigate }: { locale: Locale; onNavigate: () => void }) {
   const pathname = usePathname() ?? "/";
   const active = activeKey(pathname);
-  // Close the overlay drawer whenever the route changes.
-  useEffect(() => onNavigate(), [pathname, onNavigate]);
+  // Close the overlay drawer when the route changes (not on mount, not on unrelated re-renders).
+  const prev = useRef(pathname);
+  useEffect(() => {
+    if (prev.current === pathname) return;
+    prev.current = pathname;
+    onNavigate();
+  }, [pathname, onNavigate]);
   return <NavList locale={locale} active={active} onNavigate={onNavigate} />;
 }
 
