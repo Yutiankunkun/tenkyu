@@ -17,6 +17,10 @@ const notoSC = Noto_Sans_SC({
   preload: false,
 });
 
+// Applies the stored theme before first paint (dark is the default). Kept tiny and inline
+// on purpose: a React effect would flash the default theme first.
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("tenkyu:theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")}catch(e){document.documentElement.setAttribute("data-theme","dark")}})();`;
+
 type Params = Promise<{ locale: string }>;
 
 export function generateStaticParams() {
@@ -35,17 +39,17 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },
-  ],
+  themeColor: "#006fb9",
 };
 
 export default async function LocaleLayout({ children, params }: Readonly<{ children: React.ReactNode; params: Params }>) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   return (
-    <html lang={locale} className={`${notoSC.variable} h-full antialiased`}>
+    <html lang={locale} data-theme="dark" className={`${notoSC.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col bg-bg text-fg">
         <LocaleProvider locale={locale} messages={getMessages(locale)}>
           {children}

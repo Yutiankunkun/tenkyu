@@ -33,27 +33,9 @@ export default async function StarsPage({ params, searchParams }: { params: Para
   const locale = localeOf((await params).locale);
   const m = getMessages(locale);
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{m.board.title}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {fmt(m.board.intro, { gate: LEVEL_GATE })}
-            <Link href={localePath(locale, "/about")} className="ml-2 underline">
-              {m.board.how}
-            </Link>
-            <Link href={localePath(locale, "/check")} className="ml-2 underline">
-              {m.board.checkMe}
-            </Link>
-          </p>
-        </div>
-      </header>
-      <div className="mt-6">
-        <Suspense fallback={<p className="text-muted">{m.board.loading}</p>}>
-          <Board locale={locale} searchParams={searchParams} />
-        </Suspense>
-      </div>
-    </main>
+    <Suspense fallback={<p className="px-4 py-6 text-muted">{m.board.loading}</p>}>
+      <Board locale={locale} searchParams={searchParams} />
+    </Suspense>
   );
 }
 
@@ -80,7 +62,7 @@ async function Board({ locale, searchParams }: { locale: Locale; searchParams: S
   try {
     data = await getStars(query);
   } catch {
-    return <p className="text-muted">{m.board.unavailable}</p>;
+    return <p className="px-4 py-6 text-muted">{m.board.unavailable}</p>;
   }
 
   const base = localePath(locale, "/");
@@ -96,81 +78,88 @@ async function Board({ locale, searchParams }: { locale: Locale; searchParams: S
     const s = p.toString();
     return s ? `${base}?${s}` : base;
   };
-  const chip = (on: boolean) =>
-    `rounded-full border px-3 py-1 text-sm ${on ? "border-fg bg-fg text-bg" : "border-line text-muted hover:text-fg"}`;
   const oc = data.onlineCounts;
+  const tab = (on: boolean) =>
+    `relative flex h-12 shrink-0 items-center gap-1.5 px-3 text-[13px] uppercase tracking-wide ${on ? "text-fg after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-accent" : "text-muted hover:text-fg"}`;
+  const count = (n: number | undefined) =>
+    n === undefined ? null : <span className="rounded-full bg-fg/10 px-1.5 text-[11px] font-medium leading-5">{n}</span>;
+  const chip = (on: boolean) =>
+    `rounded-full border px-3 py-1 text-[13px] ${on ? "border-accent bg-accent/15 text-fg" : "border-line text-muted hover:text-fg"}`;
 
   return (
-    <div className="space-y-4">
-      <form action={base} method="get" className="flex gap-2">
-        {query.online ? <input type="hidden" name="o" value={query.online} /> : null}
-        {query.band !== "all" ? <input type="hidden" name="band" value={query.band} /> : null}
-        {query.sort !== DEFAULT_SORT ? <input type="hidden" name="sort" value={query.sort} /> : null}
-        <input
-          name="q"
-          defaultValue={query.q ?? ""}
-          placeholder={m.board.searchPlaceholder}
-          maxLength={40}
-          className="w-full max-w-md rounded-md border border-line bg-bg px-3 py-2 text-sm"
-        />
-        <button className="rounded-md border border-line px-3 py-2 text-sm hover:bg-fg/5">{m.board.search}</button>
-        {query.q || query.topic ? (
-          <Link href={href({ q: null, topic: null })} className="self-center text-sm text-muted hover:text-fg">
-            {m.board.clear}
+    <div>
+      {/* Tabs row (online bands), Holodex-style, sticky under the app bar. */}
+      <div className="sticky top-14 z-20 border-b border-line bg-bg/95 backdrop-blur">
+        <div className="flex items-center overflow-x-auto px-2">
+          <Link href={href({ online: null })} className={tab(query.online === null)}>
+            {m.board.all} {count(oc ? oc.le10 + oc.b11_30 + oc.b31_50 + oc.gt50 + oc.unknown : undefined)}
           </Link>
-        ) : null}
-      </form>
-
-      {/* Discovery axis: bands of the logged-in viewer count. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Link href={href({ online: null })} className={chip(query.online === null)}>
-          {m.board.all}
-        </Link>
-        {ONLINE_BANDS.map((b) => (
-          <Link key={b} href={href({ online: b })} className={chip(query.online === b)}>
-            {m.board.onlineBands[b]} {oc ? <span className="opacity-60">{oc[ONLINE_COUNT_KEY[b]]}</span> : null}
-          </Link>
-        ))}
-        {oc && oc.unknown > 0 ? <span className="text-xs text-muted">{fmt(m.board.unknownOnline, { n: oc.unknown })}</span> : null}
-      </div>
-
-      {/* Secondary: fans band and order. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {(["all", "small", "new"] as Band[]).map((b) => (
-          <Link key={b} href={href({ band: b })} className={chip(query.band === b)}>
-            {fmt(m.board.fansBands[b], { n: BAND_LIMIT.new ?? 0 })}
-          </Link>
-        ))}
-        <span className="mx-1 text-line">|</span>
-        {SORTS.map((s) => (
-          <Link key={s} href={href({ sort: s })} className={chip(query.sort === s)}>
-            {m.board.sort[s]}
-          </Link>
-        ))}
-      </div>
-
-      {data.topics.length > 1 ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Link href={href({ topic: null })} className={chip(query.topic === null)}>
-            {m.board.all}
-          </Link>
-          {data.topics.map(({ topic, n }) => (
-            <Link key={topic} href={href({ topic })} className={chip(query.topic === topic)}>
-              {m.topics[topic]} <span className="opacity-60">{n}</span>
+          {ONLINE_BANDS.map((b) => (
+            <Link key={b} href={href({ online: b })} className={tab(query.online === b)}>
+              {m.board.onlineBands[b]} {count(oc ? oc[ONLINE_COUNT_KEY[b]] : undefined)}
             </Link>
           ))}
         </div>
-      ) : null}
+      </div>
 
-      <StarsGrid
-        rows={data.rows}
-        total={data.total}
-        page={data.page}
-        pages={data.pages}
-        pageBase={href({ page: 1 })}
-        now={data.now}
-        updatedAt={data.updatedAt}
-      />
+      <div className="px-4 py-4">
+        {/* Secondary filters: sort, followers, topic. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-faint">{m.board.sortLabel}</span>
+            {SORTS.map((s) => (
+              <Link key={s} href={href({ sort: s })} className={chip(query.sort === s)}>
+                {m.board.sort[s]}
+              </Link>
+            ))}
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-faint">{m.board.fansLabel}</span>
+            {(["all", "small", "new"] as Band[]).map((b) => (
+              <Link key={b} href={href({ band: b })} className={chip(query.band === b)}>
+                {fmt(m.board.fansBands[b], { n: BAND_LIMIT.new ?? 0 })}
+              </Link>
+            ))}
+          </span>
+          {data.topics.length > 1 ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-faint">{m.board.topicLabel}</span>
+              <Link href={href({ topic: null })} className={chip(query.topic === null)}>
+                {m.board.all}
+              </Link>
+              {data.topics.map(({ topic, n }) => (
+                <Link key={topic} href={href({ topic })} className={chip(query.topic === topic)}>
+                  {m.topics[topic]} <span className="opacity-60">{n}</span>
+                </Link>
+              ))}
+            </span>
+          ) : null}
+        </div>
+
+        {query.q ? (
+          <p className="mt-3 text-sm text-muted">
+            {fmt(m.board.results, { q: query.q })}
+            <Link href={href({ q: null })} className="ml-2 underline">
+              {m.board.clear}
+            </Link>
+          </p>
+        ) : null}
+        {oc && oc.unknown > 0 && query.online !== null ? <p className="mt-2 text-xs text-faint">{fmt(m.board.unknownOnline, { n: oc.unknown })}</p> : null}
+
+        <div className="mt-4">
+          <StarsGrid rows={data.rows} total={data.total} page={data.page} pages={data.pages} pageBase={href({ page: 1 })} now={data.now} updatedAt={data.updatedAt} />
+        </div>
+
+        <p className="mt-10 text-xs text-faint">
+          {fmt(m.board.intro, { gate: LEVEL_GATE })}
+          <Link href={localePath(locale, "/about")} className="ml-2 underline">
+            {m.board.how}
+          </Link>
+          <Link href={localePath(locale, "/check")} className="ml-2 underline">
+            {m.board.checkMe}
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
