@@ -11,6 +11,10 @@ type Props = { roomId: number; name: string; poster: string };
  * With Cache Components, a route you navigate away from stays mounted (hidden) for
  * instant back-navigation — so the player must unmount itself when its effects are
  * cleaned up, or the audio keeps playing on the next page.
+ *
+ * The embed always plays as a guest: `credentialless` makes Chromium load it in a fresh context
+ * without the viewer's bilibili.com cookies (Firefox / Safari already isolate third-party
+ * cookies). Watching under one's own account is what the "open room" link to bilibili.com is for.
  */
 export function PlayerGate({ roomId, name, poster }: Props) {
   const { m } = useI18n();
@@ -29,6 +33,8 @@ export function PlayerGate({ roomId, name, poster }: Props) {
         className="h-full w-full"
         allow="autoplay; fullscreen; picture-in-picture"
         allowFullScreen
+        // Not in React's iframe typings yet; an empty string renders the boolean attribute.
+        {...{ credentialless: "" }}
       />
     );
   }

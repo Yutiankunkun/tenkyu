@@ -110,7 +110,7 @@ export const en: Messages = {
     space: "Bilibili profile",
     onlineTitle: "Logged-in viewers, from Bilibili's room rank; guests are not counted. Refreshed about every minute.",
     footnote:
-      "Official embedded player, view only. To chat or subscribe, open the room on Bilibili. Data comes from Bilibili's public API, refreshed about every 10 minutes; “online” counts logged-in viewers and refreshes about every minute.",
+      "Official embedded player, watched as a guest, view only. To watch with your own account, chat or subscribe, open the room on Bilibili. Data comes from Bilibili's public API, refreshed about every 10 minutes; “online” counts logged-in viewers and refreshes about every minute.",
     back: "Back to the observatory",
     alsoLive: "Also live now",
     more: "See more",
