@@ -33,8 +33,9 @@ export function PlayerGate({ roomId, name, poster }: Props) {
         className="h-full w-full"
         allow="autoplay; fullscreen; picture-in-picture"
         allowFullScreen
-        // Not in React's iframe typings yet; an empty string renders the boolean attribute.
-        {...{ credentialless: "" }}
+        // Not in React's iframe typings yet. Next's bundled React treats it as a boolean
+        // attribute: it must be `true` ("" counts as false and removes the attribute).
+        {...{ credentialless: true }}
       />
     );
   }
